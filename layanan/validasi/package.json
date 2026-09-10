@@ -1,0 +1,13 @@
+{
+  "name": "layanan-validasi",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "amqplib": "^0.10.4",
+    "pg": "^8.13.1"
+  }
+}

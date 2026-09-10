@@ -1,0 +1,20 @@
+{
+  "name": "simpel-lab",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Lab praktik PJJ Message Broker 2026 - SIMPEL (Sistem Perizinan Elektronik, fiktif)",
+  "workspaces": [
+    "sinkron/*",
+    "layanan/*"
+  ],
+  "scripts": {
+    "sinkron:gateway": "node --env-file=.env sinkron/gateway/index.js",
+    "sinkron:validasi": "node --env-file=.env sinkron/validasi/index.js",
+    "sinkron:billing": "node --env-file=.env sinkron/billing/index.js",
+    "sinkron:notifikasi": "node --env-file=.env sinkron/notifikasi/index.js",
+    "beban": "node --env-file=.env tools/beban.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
