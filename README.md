@@ -7,11 +7,10 @@ Semua praktik memakai satu skenario fiktif yang sama: **SIMPEL — Sistem
 Perizinan Elektronik**. Nama layanannya tetap dalam bentuk ini di seluruh
 materi (modul, slide, narasi, lab):
 
-```
-Pengguna → gateway → validasi → billing → notifikasi
-                          ↓
-                     tracking
-```
+Urutan bisnisnya adalah pengajuan → validasi → billing → notifikasi; tracking
+mencatat status. Pada demo `sinkron/`, gateway memanggil layanan satu per satu.
+Pada rancangan asinkron Lab 2, exchange merutekan event ke queue masing-masing
+consumer. Diagram bisnis ini tidak menyatakan bahwa kode asinkron sudah lengkap.
 
 | Layanan | Peran | Sifat yang sengaja dipilih |
 |---|---|---|
@@ -58,8 +57,10 @@ Lalu ikuti panduan lab sesuai jadwal hari itu:
 |---|---|---|
 | 1 | Lab 0 — broker hidup | `lab/lab0-broker-hidup/` |
 | 1 | Demo sinkron (MP-2) | `sinkron/README.md` |
-| 2 | Lab 1 — bedah topologi | `lab/lab1-topologi/` |
-| 3–4 | Lab 2–4 — producer/consumer, routing | *(disiapkan menyusul)* |
+| 2 | Lab 1 — bedah topologi (MP-04, 90 menit) | [Panduan Lab 1](lab/lab1-topologi/README.md) |
+| 2 | Lab 2 — desain integrasi (MP-05, 45 menit) | [Panduan dan lembar kerja](lab/lab2-desain/README.md) |
+| 2 | Demo instruktur Kafka (MP-04) | [Demo replay](demo/kafka/README.md) |
+| 3–4 | Lab 3–4 — producer/consumer, routing | *(disiapkan menyusul)* |
 | 4–5 | Lab 5–7 — end-to-end, monitoring, troubleshooting | *(disiapkan menyusul)* |
 
 ## Kenapa dua versi (`sinkron/` vs `layanan/`)?

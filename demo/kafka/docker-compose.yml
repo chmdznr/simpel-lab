@@ -1,0 +1,5 @@
+services:
+  kafka:
+    image: apache/kafka:4.0.2
+    # ponytail: single-node instructor demo; all clients run inside this container.
+    # No host port or persistent volume is needed for the disposable replay example.
