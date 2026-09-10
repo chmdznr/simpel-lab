@@ -15,7 +15,7 @@ consumer. Diagram bisnis ini tidak menyatakan bahwa kode asinkron sudah lengkap.
 | Layanan | Peran | Sifat yang sengaja dipilih |
 |---|---|---|
 | `gateway` | Terima pengajuan (HTTP) | Titik ukur response time |
-| `validasi` | Validasi dokumen | CPU-bound, hantam DB → sumber LI-2 |
+| `validasi` | Validasi dokumen | Demo sinkron: kerja CPU; Lab 3: I/O DB dengan pool terbatas |
 | `billing` | Terbitkan kode billing | Bergantung sistem eksternal, kadang mati → sumber LI-1 |
 | `notifikasi` | Kirim notifikasi | Lambat (pihak ketiga, \~3 dtk) → sumber LI-3 |
 | `tracking` | Audit & status | Konsumen kedua atas event yang sama → contoh pub-sub |
@@ -60,7 +60,9 @@ Lalu ikuti panduan lab sesuai jadwal hari itu:
 | 2 | Lab 1 — bedah topologi (MP-04, 90 menit) | [Panduan Lab 1](lab/lab1-topologi/README.md) |
 | 2 | Lab 2 — desain integrasi (MP-05, 45 menit) | [Panduan dan lembar kerja](lab/lab2-desain/README.md) |
 | 2 | Demo instruktur Kafka (MP-04) | [Demo replay](demo/kafka/README.md) |
-| 3–4 | Lab 3–4 — producer/consumer, routing | *(disiapkan menyusul)* |
+| 3 | Lab 3 — producer/consumer, 180 menit | [Panduan dan uji](lab/lab3-producer-consumer/README.md) |
+| 3 | Lab 4A — fanout, 45 menit | [Panduan Lab 4A](lab/lab4-routing/README.md) |
+| 4 | Lab 4B — routing lanjutan, retry/DLQ, 90 menit | *(belum disusun)* |
 | 4–5 | Lab 5–7 — end-to-end, monitoring, troubleshooting | *(disiapkan menyusul)* |
 
 ## Kenapa dua versi (`sinkron/` vs `layanan/`)?

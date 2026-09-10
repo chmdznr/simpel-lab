@@ -12,9 +12,19 @@
     "sinkron:validasi": "node --env-file=.env sinkron/validasi/index.js",
     "sinkron:billing": "node --env-file=.env sinkron/billing/index.js",
     "sinkron:notifikasi": "node --env-file=.env sinkron/notifikasi/index.js",
-    "beban": "node --env-file=.env tools/beban.js"
+    "beban": "node --env-file=.env tools/beban.js",
+    "broker:gateway": "node --env-file=.env layanan/gateway/index.js",
+    "broker:validasi": "node --env-file=.env layanan/validasi/index.js",
+    "broker:tracking": "node --env-file=.env layanan/tracking/index.js",
+    "db:siapkan": "node --env-file=.env tools/siapkan-db.js",
+    "kirim": "node --env-file=.env tools/kirim.js",
+    "hasil": "node --env-file=.env tools/hasil.js",
+    "verify:day3": "node tools/verify-day3.js"
+  },
+  "overrides": {
+    "express": { "qs": "^6.16.0" }
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=20.6"
   }
 }

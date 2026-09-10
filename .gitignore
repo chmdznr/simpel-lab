@@ -4,3 +4,4 @@ node_modules/
 !.env.contoh
 .DS_Store
 *.log
+.evidence/

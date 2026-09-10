@@ -1,9 +1,6 @@
-// SIMPEL - versi BERBROKER - tracking
-//
-// KERANGKA SAJA. Konsumen KEDUA atas event "pengajuan.diterima" yang sama --
-// contoh pub-sub (fanout exchange), dibangun di Lab 4 (MP-7 7.2a). Tugasnya
-// cuma mencatat status, tidak memblokir alur utama gateway->validasi->billing.
-
-// TODO(Lab 4): buat fanout exchange "pengajuan.event", bind queue tracking
-// ke situ bersama queue validasi, konsumsi dengan pola yang sama seperti
-// layanan/validasi/index.js.
+// Working starter. Read acknowledgement and prefetch exercises in ../worker.js.
+const { runWorker } = require('../worker');
+runWorker('tracking').catch(() => {
+  console.error('tracking startup failed. Check broker, database, and npm run db:siapkan.');
+  process.exit(1);
+});

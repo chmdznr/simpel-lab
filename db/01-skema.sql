@@ -16,3 +16,11 @@ CREATE TABLE IF NOT EXISTS pesan_diproses (
     layanan      TEXT        NOT NULL,
     diproses_pada TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Independent tracking effect for Lab 4A; it does not overwrite validation state.
+CREATE TABLE IF NOT EXISTS jejak_pengajuan (
+    message_id TEXT PRIMARY KEY,
+    pengajuan_id TEXT NOT NULL,
+    event TEXT NOT NULL,
+    dicatat_pada TIMESTAMPTZ NOT NULL DEFAULT now()
+);
