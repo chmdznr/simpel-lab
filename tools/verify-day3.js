@@ -175,7 +175,13 @@ let ownsStack = false;
 // Ownership is granted only after the initial preflight says the project is absent.
 const preflight = spawnSync('docker', ['ps', '-aq', '--filter', 'label=com.docker.compose.project=simpel-day3-qa'], { encoding: 'utf8' });
 if (preflight.status === 0 && !preflight.stdout.trim()) ownsStack = true;
-main().catch(error => { console.error(error.stack); process.exitCode = 1; })
+main().catch(error => {
+  console.error(error.stack); process.exitCode = 1;
+  if (ownsStack) {
+    const logs = spawnSync('docker', [...compose, 'logs', '--no-color', '--tail', '60', 'rabbitmq'], { encoding: 'utf8', timeout: 10000 });
+    console.error((logs.stdout || '').slice(-12000));
+  }
+})
   .finally(async () => {
     for (const child of children) await stop(child).catch(() => child.kill('SIGKILL'));
     if (publisher) await publisher.close();

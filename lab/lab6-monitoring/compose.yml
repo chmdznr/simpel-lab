@@ -1,0 +1,63 @@
+# Independent day-five stack. Does not reuse participant or older Grafana volumes.
+services:
+  rabbitmq:
+    image: rabbitmq:4.3.5-management
+    environment:
+      RABBITMQ_DEFAULT_USER: labops
+      RABBITMQ_DEFAULT_PASS: labops-only
+    ports:
+      - "127.0.0.1:5775:5672"
+      - "127.0.0.1:15695:15672"
+    volumes:
+      - ../../infra/rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
+      - ./rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      # Early root probes can create a cookie the broker user cannot read.
+      test: ["CMD", "gosu", "rabbitmq", "rabbitmq-diagnostics", "-q", "check_running"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: labops
+      POSTGRES_PASSWORD: labops-only
+      POSTGRES_DB: labops
+    ports:
+      - "127.0.0.1:5475:5432"
+    volumes:
+      - ../../db:/docker-entrypoint-initdb.d:ro
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U labops -d labops"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+  prometheus:
+    image: prom/prometheus:v3.14.0
+    ports:
+      - "127.0.0.1:9095:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./alerts.yml:/etc/prometheus/alerts.yml:ro
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+  grafana:
+    image: grafana/grafana:13.2.1
+    environment:
+      GF_SECURITY_ADMIN_USER: labops
+      GF_SECURITY_ADMIN_PASSWORD: labops-only
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    ports:
+      - "127.0.0.1:3005:3000"
+    volumes:
+      - ./grafana:/etc/grafana/provisioning:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+volumes:
+  rabbitmq-data:
+  postgres-data:
+  grafana-data:

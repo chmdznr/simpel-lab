@@ -1,0 +1,20 @@
+# Classroom thresholds are intentionally small; tune from an operational baseline.
+groups:
+  - name: simpel-lab
+    rules:
+      - alert: SimpelQueueWithoutConsumer
+        expr: (rabbitmq_queue_messages_ready > 0) and on(job,instance,vhost,queue) (rabbitmq_queue_consumers == 0)
+        for: 15s
+        labels:
+          severity: warning
+        annotations:
+          summary: "Pending messages without a consumer"
+          description: "Inspect the queue's owner, consumer process, and connection. Do not purge the queue."
+      - alert: SimpelRabbitTargetDown
+        expr: up{job="rabbitmq"} == 0
+        for: 15s
+        labels:
+          severity: warning
+        annotations:
+          summary: "RabbitMQ metrics cannot be scraped"
+          description: "A failed scrape is not yet proof that AMQP or business processing is down."

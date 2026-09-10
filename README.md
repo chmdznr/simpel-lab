@@ -66,7 +66,16 @@ Lalu ikuti panduan lab sesuai jadwal hari itu:
 | 3 | Lab 4A — fanout, 45 menit | [Panduan Lab 4A](lab/lab4-routing/README.md) |
 | 4 | Lab 4B — routing lanjutan, retry/DLQ, 90 menit | [Panduan Lab 4B](lab/lab4-routing/README-part2.md) |
 | 4 | Lab 5 — end-to-end dan pengukuran, 135 menit | [Panduan Lab 5](lab/lab5-integrasi/README.md) |
-| 5 | Lab 6–7 — monitoring dan troubleshooting | *(disiapkan menyusul)* |
+| 5 | Lab 6 — monitoring dan izin, 90 menit | [Dashboard, alert, permission probe](lab/lab6-monitoring/README.md) |
+| 5 | Lab 7 — troubleshooting, 45 menit per kelompok | [Empat kasus dan worksheet](lab/lab7-troubleshooting/README.md) |
+| 5 / minggu 2 | Pengarahan Action Learning | [Template proyek dan checkpoint](lab/action-learning/TEMPLATE.md) |
+
+Hari kelima memakai stack terpisah melalui `npm run operasi -- up` dan tidak
+membaca `.env` sebelumnya. Ikuti Lab 6 untuk port serta kredensial dummy lokal;
+volume Grafana lama tidak dimigrasikan. `npm run verify:day5` menguji metrik,
+alert, batas izin, empat repair dengan ID asli, dan pemulihan alarm memori
+pada project QA miliknya sendiri. Hentikan `simpel-ops` sebelum verifier karena
+port host sama. Shutdown peserta mempertahankan volume.
 
 Hari keempat menyediakan `tools/beban-alur.js` untuk pembanding terkontrol
 dengan fungsi efek bisnis yang sama pada mode sync dan async. Ukur HTTP response,

@@ -8,7 +8,8 @@ services:
       - "127.0.0.1:5763:5672"
       - "127.0.0.1:15683:15672"
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      # Early root probes can create a cookie the broker user cannot read.
+      test: ["CMD", "gosu", "rabbitmq", "rabbitmq-diagnostics", "-q", "check_running"]
       interval: 2s
       timeout: 5s
       retries: 30

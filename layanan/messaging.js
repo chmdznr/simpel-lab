@@ -47,8 +47,8 @@ function validateEvent(event, properties = {}) {
   return event;
 }
 
-async function openPublisher(declare = declareTopology) {
-  const connection = await amqp.connect(process.env.AMQP_URL || 'amqp://simpel:simpel123@localhost:5672');
+async function openPublisher(declare = declareTopology, url = process.env.AMQP_URL || 'amqp://simpel:simpel123@localhost:5672') {
+  const connection = await amqp.connect(url);
   connection.on('error', () => {}); // Close rejects pending work; never print connection URLs.
   let channel, spec;
   try {

@@ -26,7 +26,10 @@
     "alur:billing": "node --env-file=.env layanan/alur.js billing",
     "alur:notifikasi": "node --env-file=.env layanan/alur.js notifikasi",
     "alur:tracking": "node --env-file=.env layanan/alur.js tracking",
-    "verify:day4": "node tools/verify-day4.js"
+    "verify:day4": "node tools/verify-day4.js",
+    "operasi": "node tools/operasi.js",
+    "kasus": "node tools/kasus.js",
+    "verify:day5": "node tools/verify-day5.js"
   },
   "overrides": {
     "express": { "qs": "^6.16.0" }
