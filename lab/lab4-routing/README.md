@@ -3,7 +3,8 @@
 
 MP-07 total 4 JP dibagi dua hari. Hari ketiga berisi teori routing 45 menit dan
 Lab 4A 45 menit; hari keempat berisi Lab 4B 90 menit untuk routing lanjutan,
-retry tertunda, dan penanganan DLQ. Folder ini menyajikan **Lab 4A yang siap dijalankan**.
+retry tertunda, dan penanganan DLQ. Halaman ini menyajikan Lab 4A;
+lanjutan hari keempat tersedia di [Lab 4B](README-part2.md).
 
 ## Target dan batas
 Satu event pengajuan diterima harus menghasilkan catatan validasi dan catatan tracking

@@ -19,7 +19,14 @@
     "db:siapkan": "node --env-file=.env tools/siapkan-db.js",
     "kirim": "node --env-file=.env tools/kirim.js",
     "hasil": "node --env-file=.env tools/hasil.js",
-    "verify:day3": "node tools/verify-day3.js"
+    "verify:day3": "node tools/verify-day3.js",
+    "routing": "node --env-file=.env tools/routing.js",
+    "alur:gateway": "node --env-file=.env layanan/alur.js gateway",
+    "alur:validasi": "node --env-file=.env layanan/alur.js validasi",
+    "alur:billing": "node --env-file=.env layanan/alur.js billing",
+    "alur:notifikasi": "node --env-file=.env layanan/alur.js notifikasi",
+    "alur:tracking": "node --env-file=.env layanan/alur.js tracking",
+    "verify:day4": "node tools/verify-day4.js"
   },
   "overrides": {
     "express": { "qs": "^6.16.0" }

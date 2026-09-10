@@ -9,8 +9,8 @@ CREATE TABLE IF NOT EXISTS pengajuan (
     dibuat_pada TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Tabel dedup untuk MP-8 (idempotensi). Konsumen mencatat message_id yang
--- sudah pernah diproses; PRIMARY KEY yang menolak duplikat adalah mekanismenya.
+-- Legacy draft table retained for existing volumes. MP-08 uses alur_inbox
+-- with the composite key (layanan,message_id) in 02-alur.sql instead.
 CREATE TABLE IF NOT EXISTS pesan_diproses (
     message_id   TEXT PRIMARY KEY,
     layanan      TEXT        NOT NULL,

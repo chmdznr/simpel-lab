@@ -47,14 +47,14 @@ function validateEvent(event, properties = {}) {
   return event;
 }
 
-async function openPublisher() {
+async function openPublisher(declare = declareTopology) {
   const connection = await amqp.connect(process.env.AMQP_URL || 'amqp://simpel:simpel123@localhost:5672');
   connection.on('error', () => {}); // Close rejects pending work; never print connection URLs.
   let channel, spec;
   try {
     channel = await connection.createConfirmChannel();
     channel.on('error', () => {}); // Topology errors may arrive before setup finishes.
-    spec = await declareTopology(channel);
+    spec = await declare(channel);
   } catch (error) {
     await connection.close().catch(() => {});
     throw error;
@@ -80,7 +80,7 @@ async function openPublisher() {
   return {
     channel, connection, spec,
     isReady: () => ready && !buffered,
-    publish(event, routingKey = 'pengajuan.diterima', exchange = spec.exchange) {
+    publish(event, routingKey = 'pengajuan.diterima', exchange = spec.exchange, headers = {}) {
       if (!ready || buffered) return Promise.reject(new Error('Publisher is not ready'));
       if (pending.has(event.messageId)) return Promise.reject(new Error('The same messageId is already in flight'));
       return new Promise((resolve, reject) => {
@@ -95,7 +95,7 @@ async function openPublisher() {
         try {
           const writable = channel.publish(exchange, routingKey, Buffer.from(JSON.stringify(event)), {
             persistent: true, mandatory: true, contentType: 'application/json',
-            messageId: event.messageId, correlationId: event.correlationId,
+            messageId: event.messageId, correlationId: event.correlationId, headers,
           }, error => job.finish(error || (job.returned ? new Error('Unroutable publication') : null)));
           // publish()'s boolean is local buffer pressure, not broker acceptance.
           if (!writable) buffered = true;

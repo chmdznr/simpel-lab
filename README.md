@@ -10,7 +10,9 @@ materi (modul, slide, narasi, lab):
 Urutan bisnisnya adalah pengajuan → validasi → billing → notifikasi; tracking
 mencatat status. Pada demo `sinkron/`, gateway memanggil layanan satu per satu.
 Pada rancangan asinkron Lab 2, exchange merutekan event ke queue masing-masing
-consumer. Diagram bisnis ini tidak menyatakan bahwa kode asinkron sudah lengkap.
+consumer. Lab 5 sekarang menjalankan lima peran melalui `layanan/alur.js`,
+dengan acceptance DB+outbox, inbox per subscriber, status pengajuan, dan kompensasi.
+Nama queue `alur.*` terpisah dari latihan hari ketiga.
 
 | Layanan | Peran | Sifat yang sengaja dipilih |
 |---|---|---|
@@ -62,8 +64,17 @@ Lalu ikuti panduan lab sesuai jadwal hari itu:
 | 2 | Demo instruktur Kafka (MP-04) | [Demo replay](demo/kafka/README.md) |
 | 3 | Lab 3 — producer/consumer, 180 menit | [Panduan dan uji](lab/lab3-producer-consumer/README.md) |
 | 3 | Lab 4A — fanout, 45 menit | [Panduan Lab 4A](lab/lab4-routing/README.md) |
-| 4 | Lab 4B — routing lanjutan, retry/DLQ, 90 menit | *(belum disusun)* |
-| 4–5 | Lab 5–7 — end-to-end, monitoring, troubleshooting | *(disiapkan menyusul)* |
+| 4 | Lab 4B — routing lanjutan, retry/DLQ, 90 menit | [Panduan Lab 4B](lab/lab4-routing/README-part2.md) |
+| 4 | Lab 5 — end-to-end dan pengukuran, 135 menit | [Panduan Lab 5](lab/lab5-integrasi/README.md) |
+| 5 | Lab 6–7 — monitoring dan troubleshooting | *(disiapkan menyusul)* |
+
+Hari keempat menyediakan `tools/beban-alur.js` untuk pembanding terkontrol
+dengan fungsi efek bisnis yang sama pada mode sync dan async. Ukur HTTP response,
+observed completion, dan tekanan DB secara terpisah. Ini berbeda dari demo
+CPU-bound hari pertama. Notifikasi hari keempat adalah receipt DB sintetis.
+`npm run verify:day4` menjalankan pemeriksaan terisolasi, termasuk dua burst 500;
+`npm run verify:day3` memeriksa regresi latihan sebelumnya. Jangan menjalankan
+keduanya bersamaan karena memakai port QA yang sama.
 
 ## Kenapa dua versi (`sinkron/` vs `layanan/`)?
 
