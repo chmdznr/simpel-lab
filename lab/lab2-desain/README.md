@@ -4,7 +4,7 @@
 
 Lab ini berfokus pada **perancangan arsitektur integrasi di atas kertas**, tanpa instalasi Docker atau coding aplikasi. Gunakan [lembar kerja satu halaman (PDF)](lembar-kerja.pdf) untuk dicetak, atau salin [lembar kerja format Markdown](lembar-kerja.md) ke catatan kerja kelompok Anda.
 
-Cetak biru integrasi yang Anda susun hari ini akan menjadi pegangan langsung saat mengimplementasikan kode producer dan consumer di modul MP-06 sampai MP-08, serta tugas proyek Capstone.
+Cetak biru integrasi yang Anda susun hari ini akan menjadi pegangan langsung saat mengimplementasikan kode producer dan consumer di modul MP-06 sampai MP-08, serta tugas proyek Capstone. Sebagai acuan desain terverifikasi (*model answer*) yang selaras penuh dengan kode `layanan/alur.js` & `messaging.js`, silakan pelajari **[Contoh Lembar Desain SIMPEL Terisi (Markdown)](lembar-kerja-contoh.md)** atau unduh **[Contoh Lembar Desain PDF (2 Halaman)](lembar-kerja-contoh.pdf)**.
 
 ---
 
@@ -108,4 +108,4 @@ Gunakan rubrik skor sederhana (0 = belum ada, 1 = ada tetapi belum konsisten, 2 
 | **4. Penanganan Kegagalan** | Apakah retry berbatas, strategi idempotensi, dan kepemilikan DLQ menjawab 3 kartu gangguan? |
 | **5. Pembuktian & Pengujian** | Apakah terdapat rencana pengujian konkret untuk memvalidasi alur sukses dan alur recovery? |
 
-Simpan hasil kerja kelompok dengan nama `lab2-<nama-kelompok>.pdf` atau `.md`. Cetak biru ini akan digunakan kembali saat praktik implementasi producer-consumer di MP-06 sampai MP-08.
+Simpan hasil kerja kelompok dengan nama `lab2-<nama-kelompok>.pdf` atau `.md`. Cetak biru ini akan digunakan kembali saat praktik implementasi producer-consumer di MP-06 sampai MP-08. Anda dapat membandingkan keputusan desain kelompok Anda dengan cetak biru acuan di [lembar-kerja-contoh.md](lembar-kerja-contoh.md) atau [lembar-kerja-contoh.pdf](lembar-kerja-contoh.pdf).
