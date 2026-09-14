@@ -103,15 +103,16 @@ c.setFillColor(navy)
 c.drawString(margin, y2, '2. Diagram Alur Data & Kepemilikan State (SIMPEL 5 Services)')
 
 diagram_text = [
-    [Paragraph('<b>Alur Happy Path:</b><br/>'
-               '1. Pemohon &rarr; <b>Gateway</b> (DB lokal + Outbox) &rarr; HTTP 202 Accepted ke Pemohon.<br/>'
-               '2. Gateway &rarr; <i>simpel.events</i> (rk: <i>pengajuan.diterima</i>) &rarr; <b>validasi.q</b> &rarr; <b>Validasi Service</b> (DB <i>alur_validasi</i>, status <i>reserved</i>).<br/>'
-               '3. Validasi &rarr; <i>simpel.events</i> (rk: <i>validasi.selesai</i>) &rarr; <b>billing.q</b> &rarr; <b>Billing Service</b> (DB <i>alur_billing</i>, terbit <i>BIL-SIM-001</i>).<br/>'
-               '4. Billing &rarr; <i>simpel.events</i> (rk: <i>billing.terbit</i>) &rarr; <b>notifikasi.q</b> &rarr; <b>Notifikasi Service</b> (Kirim konfirmasi email/SMS pemohon).<br/>'
-               '5. <b>Tracking Service:</b> Subscribe wildcard <i>#</i> pada <i>tracking.q</i> &rarr; mencatat seluruh linimasa audit trail di DB <i>alur_tracking</i>.<br/>'
-               '<b>Cabang Kegagalan & Kompensasi (Saga):</b><br/>'
-               '&bull; Validasi berkas gagal: publish <i>pengajuan.ditolak</i> (hanya masuk <i>tracking.q</i>, tidak ke billing).<br/>'
-               '&bull; Billing gagal sistemik: publish <i>billing.gagal</i> &rarr; diterima <i>validasi.q</i> &rarr; kompensasi ubah status dari <i>reserved</i> &rarr; <i>cancelled</i> &rarr; publish <i>pengajuan.dibatalkan</i>.', style_body)]
+    [Paragraph('<b>Alur Urutan Layanan (Happy Path):</b><br/>'
+               '&bull; <b>1. Penerimaan:</b> Pemohon &rarr; <b>Gateway</b> (simpan DB lokal + outbox) &rarr; HTTP 202 Accepted (<i>SIM-001</i>) &rarr; publish <i>pengajuan.diterima</i>.<br/>'
+               '&bull; <b>2. Validasi:</b> <i>validasi.q</i> &rarr; <b>Validasi Service</b> (catat DB <i>alur_validasi</i> status <i>reserved</i>) &rarr; publish <i>validasi.selesai</i>.<br/>'
+               '&bull; <b>3. Billing:</b> <i>billing.q</i> &rarr; <b>Billing Service</b> (catat DB <i>alur_billing</i> kode <i>BIL-SIM-001</i>) &rarr; publish <i>billing.terbit</i>.<br/>'
+               '&bull; <b>4. Notifikasi:</b> <i>notifikasi.q</i> &rarr; <b>Notifikasi Service</b> (kirim email/SMS pemohon) &rarr; publish <i>notifikasi.terkirim</i>.<br/>'
+               '&bull; <b>5. Audit Trail:</b> <b>Tracking Service</b> subscribe wildcard <i>#</i> pada <i>tracking.q</i> &rarr; rekam linimasa transaksi di <i>alur_tracking</i>.<br/>'
+               '<b>Penanganan Kegagalan, DLQ, & Kompensasi Saga:</b><br/>'
+               '&bull; <i>Cacat Skema:</i> Consumer me-reject pesan &rarr; otomatis masuk ke DLQ <i>pengajuan.invalid</i> via <i>simpel.invalid</i>.<br/>'
+               '&bull; <i>Validasi Ditolak:</i> Publish <i>pengajuan.ditolak</i> &rarr; masuk ke <i>tracking.q</i> & <i>notifikasi.q</i> (tidak ke billing).<br/>'
+               '&bull; <i>Kompensasi Saga:</i> Billing gagal &rarr; publish <i>billing.gagal</i> &rarr; <i>validasi.q</i> merollback status <i>reserved</i> menjadi <i>cancelled</i> &rarr; publish <i>pengajuan.dibatalkan</i>.', style_body)]
 ]
 t2 = Table(diagram_text, colWidths=[usable_w])
 t2.setStyle(TableStyle([
