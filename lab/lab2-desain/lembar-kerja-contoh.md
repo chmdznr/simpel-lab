@@ -20,71 +20,119 @@
 
 ### 2. Diagram Alur Data & Kepemilikan State
 
+#### A. Diagram Urutan Interaksi & Siklus Hidup Pesan (Sequence Diagram)
+
 ```mermaid
-flowchart TD
-    subgraph Client ["Klien / Pemohon"]
-        Pemohon["Pemohon (Web / Mobile App)"]
+sequenceDiagram
+    autonumber
+    actor Pemohon as Pemohon
+    participant GW as Gateway (DB & Outbox)
+    participant Broker as RabbitMQ (simpel.events)
+    participant Val as Service Validasi (alur_validasi)
+    participant Bil as Service Billing (alur_billing)
+    participant Notif as Service Notifikasi
+    participant Track as Service Tracking (alur_tracking)
+
+    %% 1. Penerimaan
+    rect rgb(240, 248, 255)
+    Note over Pemohon,GW: 1. Penerimaan Pengajuan (Acceptance)
+    Pemohon->>+GW: HTTP POST /pengajuan
+    GW->>GW: Simpan status 'diterima' + Outbox (1 Transaksi Atomik)
+    GW-->>Pemohon: HTTP 202 Accepted (pengajuanId: SIM-001)
+    GW->>-Broker: Publish pengajuan.diterima
+    Broker-->>Track: Event pengajuan.diterima (Audit)
     end
 
-    subgraph Service_Gateway ["Service Gateway"]
-        Gateway["Gateway API<br/>(DB Gateway: pengajuan & outbox)"]
+    %% 2. Validasi
+    rect rgb(245, 255, 250)
+    Note over Broker,Val: 2. Verifikasi Dokumen & Reservasi
+    Broker->>+Val: Kirim ke validasi.q
+    Val->>Val: Catat alur_validasi (status: 'reserved')
+    Val->>Broker: Ack & Publish validasi.selesai
+    deactivate Val
+    Broker-->>Track: Event validasi.selesai (Audit)
     end
 
-    subgraph Broker ["RabbitMQ Broker"]
-        Exchange{{"Topic Exchange:<br/>simpel.events"}}
-        DLX{{"Direct Exchange:<br/>simpel.invalid"}}
-        
-        Q_Validasi[("Queue:<br/>validasi.q")]
-        Q_Billing[("Queue:<br/>billing.q")]
-        Q_Notif[("Queue:<br/>notifikasi.q")]
-        Q_Track[("Queue:<br/>tracking.q")]
-        Q_DLQ[("DLQ:<br/>pengajuan.invalid")]
+    %% 3. Billing
+    rect rgb(255, 250, 240)
+    Note over Broker,Bil: 3. Penerbitan Kode Billing (Completion)
+    Broker->>+Bil: Kirim ke billing.q
+    Bil->>Bil: Terbitkan kode bayar BIL-SIM-001 di alur_billing
+    Bil->>Broker: Ack & Publish billing.terbit
+    deactivate Bil
+    Broker-->>Track: Event billing.terbit (Audit)
     end
 
-    subgraph Workers ["Service Consumers"]
-        Validasi["Service Validasi<br/>(DB: alur_validasi)"]
-        Billing["Service Billing<br/>(DB: alur_billing)"]
-        Notifikasi["Service Notifikasi<br/>(DB: alur_notifikasi)"]
-        Tracking["Service Tracking<br/>(DB: alur_tracking)"]
+    %% 4. Notifikasi
+    rect rgb(248, 248, 255)
+    Note over Broker,Notif: 4. Pengiriman Konfirmasi Pemohon
+    Broker->>+Notif: Kirim ke notifikasi.q
+    Notif->>Pemohon: Kirim Email & SMS (Kode Bayar Terbit)
+    Notif->>Broker: Ack & Publish notifikasi.terkirim
+    deactivate Notif
+    Broker-->>Track: Event notifikasi.terkirim (Audit)
+    end
+```
+
+#### B. Diagram Topologi Pipeline Layanan (Pipeline Architecture)
+
+```mermaid
+flowchart LR
+    subgraph S1 ["1. Penerimaan"]
+        direction TB
+        P["Pemohon"] -->|"POST /pengajuan"| GW["Service Gateway<br/>(DB & Outbox)"]
+        GW -.->|"HTTP 202 Accepted"| P
     end
 
-    %% Happy Path Flow
-    Pemohon -->|"1. HTTP POST /pengajuan"| Gateway
-    Gateway -.->|"HTTP 202 Accepted (SIM-001)"| Pemohon
-    Gateway -->|"2. rk: pengajuan.diterima"| Exchange
+    subgraph S2 ["2. Validasi"]
+        direction TB
+        QV[("Queue:<br/>validasi.q")] -->|"consume & ack"| SV["Service Validasi<br/>(DB: alur_validasi)"]
+    end
 
-    Exchange -->|"binding: pengajuan.diterima"| Q_Validasi
-    Q_Validasi -->|"consume & ack"| Validasi
+    subgraph S3 ["3. Billing"]
+        direction TB
+        QB[("Queue:<br/>billing.q")] -->|"consume & ack"| SB["Service Billing<br/>(DB: alur_billing)"]
+    end
 
-    Validasi -->|"3. rk: validasi.selesai"| Exchange
-    Exchange -->|"binding: validasi.selesai"| Q_Billing
-    Q_Billing -->|"consume & ack"| Billing
+    subgraph S4 ["4. Notifikasi"]
+        direction TB
+        QN[("Queue:<br/>notifikasi.q")] -->|"consume & ack"| SN["Service Notifikasi<br/>(Kirim Email/SMS)"]
+    end
 
-    Billing -->|"4. rk: billing.terbit"| Exchange
-    Exchange -->|"binding: billing.terbit"| Q_Notif
-    Q_Notif -->|"consume & ack"| Notifikasi
+    subgraph S5 ["Audit Trail (Async)"]
+        direction TB
+        QT[("Queue: tracking.q")] --> ST["Service Tracking<br/>(DB: alur_tracking)"]
+    end
 
-    %% Audit Tracking Flow
-    Exchange -->|"binding: #"| Q_Track
-    Q_Track -->|"audit trail timeline"| Tracking
+    subgraph S6 ["Karantina Cacat"]
+        direction TB
+        QDLQ[("DLQ: pengajuan.invalid")]
+    end
 
-    %% Failure & Compensation (Saga Pattern)
-    Validasi -.->|"Reject (cacat skema)"| DLX
-    DLX -->|"rk: invalid"| Q_DLQ
+    %% Alur Normal Pipeline
+    GW ==>|"rk: pengajuan.diterima"| QV
+    SV ==>|"rk: validasi.selesai"| QB
+    SB ==>|"rk: billing.terbit"| QN
 
-    Validasi -.->|"Validasi Gagal (rk: pengajuan.ditolak)"| Exchange
-    Billing -.->|"Kompensasi Saga (rk: billing.gagal)"| Exchange
-    Exchange -.->|"binding: billing.gagal"| Q_Validasi
+    %% Audit Wildcard (#)
+    GW -.->|"audit (#)"| QT
+    SV -.->|"audit (#)"| QT
+    SB -.->|"audit (#)"| QT
+    SN -.->|"audit (#)"| QT
 
-    classDef service fill:#EEF2F7,stroke:#192A56,stroke-width:1.5px,color:#192A56;
-    classDef broker fill:#FEF3C7,stroke:#B45309,stroke-width:1.5px,color:#78350F;
+    %% Failure / Reject
+    SV -.->|"Reject (cacat)"| QDLQ
+    SB -.->|"Kompensasi (billing.gagal)"| QV
+
+    classDef stage fill:#F8FAFC,stroke:#94A3B8,stroke-width:1px;
+    classDef comp fill:#EEF2F7,stroke:#192A56,stroke-width:1.5px,color:#192A56;
     classDef queue fill:#ECFDF5,stroke:#047857,stroke-width:1.5px,color:#065F46;
     classDef dlq fill:#FEE2E2,stroke:#B91C1C,stroke-width:1.5px,color:#991B1B;
 
-    class Gateway,Validasi,Billing,Notifikasi,Tracking service;
-    class Exchange,DLX broker;
-    class Q_Validasi,Q_Billing,Q_Notif,Q_Track queue;
-    class Q_DLQ dlq;
+    class S1,S2,S3,S4,S5,S6 stage;
+    class GW,SV,SB,SN,ST comp;
+    class QV,QB,QN,QT queue;
+    class QDLQ dlq;
 ```
 
 **Penjelasan Alur & Kepemilikan State:**
