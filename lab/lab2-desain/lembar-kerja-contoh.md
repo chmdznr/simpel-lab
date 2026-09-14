@@ -20,75 +20,85 @@
 
 ### 2. Diagram Alur Data & Kepemilikan State
 
-```text
-[ Pemohon ]
-    │ (1) HTTP POST /pengajuan
-    ▼
-┌─────────────────────────────────────────────────────────────┐
-│ SERVICE GATEWAY (Pemilik DB Gateway: tabel pengajuan)       │
-│ • Transaksi lokal: Simpan pengajuan + Catat outbox          │
-│ • Kirim respons HTTP 202 Accepted (pengajuanId: SIM-001)    │
-└──────────────────────────────┬──────────────────────────────┘
-                               │ (2) Publish event: pengajuan.diterima
-                               ▼
-            ╔════════════════════════════════════╗
-            ║ Topic Exchange: simpel.events     ║
-            ╚════════════════════════════════════╝
-                 │                           │
-                 │ (rk: pengajuan.diterima)  │ (rk: #)
-                 ▼                           ▼
-┌──────────────────────────────┐    ┌─────────────────────────────────┐
-│ validasi.q                   │    │ tracking.q                      │
-└──────────────┬───────────────┘    └────────────────┬────────────────┘
-               ▼                                     ▼
-┌──────────────────────────────┐    ┌─────────────────────────────────┐
-│ SERVICE VALIDASI             │    │ SERVICE TRACKING                │
-│ • DB: alur_validasi          │    │ • DB: alur_tracking             │
-│   (status: 'reserved')       │    │ • Catat timeline audit trail    │
-│ • Sukses: publish event      │    │   semua event secara transparan │
-│   validasi.selesai           │    └─────────────────────────────────┘
-└──────────────┬───────────────┘
-               │ (3) rk: validasi.selesai
-               ▼
-            ╔════════════════════════════════════╗
-            ║ Topic Exchange: simpel.events     ║
-            ╚════════════════════════════════════╝
-                 │                           │
-                 │ (rk: validasi.selesai)    │ (rk: #)
-                 ▼                           ▼
-┌──────────────────────────────┐    ┌─────────────────────────────────┐
-│ billing.q                    │    │ tracking.q (update status)      │
-└──────────────┬───────────────┘    └─────────────────────────────────┘
-               ▼
-┌──────────────────────────────┐
-│ SERVICE BILLING              │
-│ • DB: alur_billing           │
-│   (kode: BIL-SIM-001)        │
-│ • Sukses: publish event      │
-│   billing.terbit             │
-└──────────────┬───────────────┘
-               │ (4) rk: billing.terbit
-               ▼
-            ╔════════════════════════════════════╗
-            ║ Topic Exchange: simpel.events     ║
-            ╚════════════════════════════════════╝
-                 │                           │
-                 │ (rk: billing.terbit)      │ (rk: #)
-                 ▼                           ▼
-┌──────────────────────────────┐    ┌─────────────────────────────────┐
-│ notifikasi.q                 │    │ tracking.q (update status)      │
-└──────────────┬───────────────┘    └─────────────────────────────────┘
-               ▼
-┌──────────────────────────────┐
-│ SERVICE NOTIFIKASI           │
-│ • Kirim konfirmasi email/SMS │
-│ • DB: alur_notifikasi        │
-└──────────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph Client ["Klien / Pemohon"]
+        Pemohon["Pemohon (Web / Mobile App)"]
+    end
 
-ALUR KEGAGALAN & KOMPENSASI (SAGA PATTERN):
-• Jika validasi gagal bisnis: Validasi mem-publish event pengajuan.ditolak (hanya masuk ke tracking.q, tidak ke billing.q).
-• Jika billing gagal sistemik/timeout: Billing mem-publish event billing.gagal -> diterima validasi.q -> Service Validasi melakukan kompensasi dengan mengubah status di alur_validasi dari 'reserved' menjadi 'cancelled' -> publish pengajuan.dibatalkan.
+    subgraph Service_Gateway ["Service Gateway"]
+        Gateway["Gateway API<br/>(DB Gateway: pengajuan & outbox)"]
+    end
+
+    subgraph Broker ["RabbitMQ Broker"]
+        Exchange{{"Topic Exchange:<br/>simpel.events"}}
+        DLX{{"Direct Exchange:<br/>simpel.invalid"}}
+        
+        Q_Validasi[("Queue:<br/>validasi.q")]
+        Q_Billing[("Queue:<br/>billing.q")]
+        Q_Notif[("Queue:<br/>notifikasi.q")]
+        Q_Track[("Queue:<br/>tracking.q")]
+        Q_DLQ[("DLQ:<br/>pengajuan.invalid")]
+    end
+
+    subgraph Workers ["Service Consumers"]
+        Validasi["Service Validasi<br/>(DB: alur_validasi)"]
+        Billing["Service Billing<br/>(DB: alur_billing)"]
+        Notifikasi["Service Notifikasi<br/>(DB: alur_notifikasi)"]
+        Tracking["Service Tracking<br/>(DB: alur_tracking)"]
+    end
+
+    %% Happy Path Flow
+    Pemohon -->|"1. HTTP POST /pengajuan"| Gateway
+    Gateway -.->|"HTTP 202 Accepted (SIM-001)"| Pemohon
+    Gateway -->|"2. rk: pengajuan.diterima"| Exchange
+
+    Exchange -->|"binding: pengajuan.diterima"| Q_Validasi
+    Q_Validasi -->|"consume & ack"| Validasi
+
+    Validasi -->|"3. rk: validasi.selesai"| Exchange
+    Exchange -->|"binding: validasi.selesai"| Q_Billing
+    Q_Billing -->|"consume & ack"| Billing
+
+    Billing -->|"4. rk: billing.terbit"| Exchange
+    Exchange -->|"binding: billing.terbit"| Q_Notif
+    Q_Notif -->|"consume & ack"| Notifikasi
+
+    %% Audit Tracking Flow
+    Exchange -->|"binding: #"| Q_Track
+    Q_Track -->|"audit trail timeline"| Tracking
+
+    %% Failure & Compensation (Saga Pattern)
+    Validasi -.->|"Reject (cacat skema)"| DLX
+    DLX -->|"rk: invalid"| Q_DLQ
+
+    Validasi -.->|"Validasi Gagal (rk: pengajuan.ditolak)"| Exchange
+    Billing -.->|"Kompensasi Saga (rk: billing.gagal)"| Exchange
+    Exchange -.->|"binding: billing.gagal"| Q_Validasi
+
+    classDef service fill:#EEF2F7,stroke:#192A56,stroke-width:1.5px,color:#192A56;
+    classDef broker fill:#FEF3C7,stroke:#B45309,stroke-width:1.5px,color:#78350F;
+    classDef queue fill:#ECFDF5,stroke:#047857,stroke-width:1.5px,color:#065F46;
+    classDef dlq fill:#FEE2E2,stroke:#B91C1C,stroke-width:1.5px,color:#991B1B;
+
+    class Gateway,Validasi,Billing,Notifikasi,Tracking service;
+    class Exchange,DLX broker;
+    class Q_Validasi,Q_Billing,Q_Notif,Q_Track queue;
+    class Q_DLQ dlq;
 ```
+
+**Penjelasan Alur & Kepemilikan State:**
+1. **Happy Path (Alur Normal):**
+   * **Pemohon $\rightarrow$ Gateway:** Mengirim request HTTP POST pengajuan. Gateway menyimpan berkas pengajuan ke tabel `pengajuan` dan mencatat event di tabel Outbox dalam 1 transaksi database lokal atomik.
+   * **Gateway $\rightarrow$ Pemohon:** Mengembalikan respons cepat `HTTP 202 Accepted` bersama nomor pendaftaran `pengajuanId: "SIM-001"` dan URL pelacakan. Gateway kemudian me-relay event ke `simpel.events` dengan routing key `pengajuan.diterima`.
+   * **Validasi Service:** Mengambil pesan dari `validasi.q`, mencatat status verifikasi di `alur_validasi (status: 'reserved')`, lalu mem-publish event `validasi.selesai`.
+   * **Billing Service:** Mengambil pesan dari `billing.q`, menerbitkan kode pembayaran di `alur_billing ('BIL-SIM-001')`, lalu mem-publish event `billing.terbit`.
+   * **Notifikasi Service:** Mengambil pesan dari `notifikasi.q`, mengirimkan konfirmasi email/SMS pemohon, dan mencatatnya di `alur_notifikasi`.
+   * **Tracking Service:** Mengambil seluruh event dari `tracking.q` via wildcard binding `#` dan mencatat kronologi lengkap di `alur_tracking`.
+2. **Alur Kegagalan & Kompensasi (Saga Pattern):**
+   * **Validasi Gagal Bisnis:** Service Validasi mem-publish event `pengajuan.ditolak` (hanya masuk ke `tracking.q` dan `notifikasi.q`, tidak diteruskan ke `billing.q`).
+   * **Billing Gagal / Timeout:** Service Billing mem-publish event `billing.gagal`. Event ini diterima kembali oleh `validasi.q`. Service Validasi mengeksekusi aksi kompensasi: membatalkan reservasi di `alur_validasi` (mengubah status `'reserved'` menjadi `'cancelled'`), lalu mem-publish event `pengajuan.dibatalkan`.
+
 
 ---
 
