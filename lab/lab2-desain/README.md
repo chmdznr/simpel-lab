@@ -1,86 +1,111 @@
-# Lab 2 — Desain integrasi SIMPEL
+# Lab 2 — Perancangan Solusi Integrasi SIMPEL
 
-**MP-05 · Hari 2 · 45 menit · kelompok 3–4 orang.** Tidak membutuhkan Docker
-atau coding. Gunakan [lembar kerja satu halaman](lembar-kerja.pdf) untuk cetak,
-atau salin [versi Markdown](lembar-kerja.md) ke dokumen kelompok.
+**Modul MP-05 · Hari 2 · Alokasi Waktu: 45 Menit · Kerja Kelompok (3–4 Orang).**
 
-## Kasus dan batas rancangan
+Lab ini berfokus pada **perancangan arsitektur integrasi di atas kertas**, tanpa instalasi Docker atau coding aplikasi. Gunakan [lembar kerja satu halaman (PDF)](lembar-kerja.pdf) untuk dicetak, atau salin [lembar kerja format Markdown](lembar-kerja.md) ke catatan kerja kelompok Anda.
 
-SIMPEL adalah sistem perizinan **fiktif**. Gateway menerima pengajuan;
-validasi memeriksa dokumen; billing menerbitkan kode; notifikasi memberi kabar;
-tracking menyajikan status. Dalam versi sinkron, gangguan billing dan notifikasi
-lambat memperpanjang waktu tunggu pengguna. Rancang jalur asinkron yang tetap
-menjaga keterlacakan pekerjaan.
+Cetak biru integrasi yang Anda susun hari ini akan menjadi pegangan langsung saat mengimplementasikan kode producer dan consumer di modul MP-06 sampai MP-08, serta tugas proyek Capstone.
 
-Tetapkan apa arti “diterima” dan “selesai”. Respons HTTP `202` tidak berarti
-validasi lolos atau billing sudah terbit. Penerimaan harus didukung penyimpanan
-yang sesuai rancangan; respons cepat saja tidak cukup. Untuk kontrak latihan,
-gunakan HTTP `202` berisi `pengajuanId` dan URL status setelah penerimaan durable.
-Jangan menjadikan angka target latihan sebagai SLA resmi atau hasil benchmark.
+---
 
-Pakai nama layanan di atas. Nama domain event yang dipakai bersama:
+## Studi Kasus dan Batasan Sistem
 
-| Producer | Event | Makna |
+Sistem perizinan fiktif **SIMPEL** memiliki 5 peran service:
+- **Gateway**: Menerima request pengajuan izin pemohon via HTTP.
+- **Validasi**: Memeriksa kelayakan dan kelengkapan berkas dokumen.
+- **Billing**: Menerbitkan kode pembayaran ke sistem perbankan.
+- **Notifikasi**: Mengirimkan konfirmasi email/SMS ke pemohon.
+- **Tracking**: Mencatat audit log perjalanan berkas dan menyajikan status ke pemohon.
+
+Pada versi synchronous (MP-02), downtime billing dan latensi vendor notifikasi membuat request pemohon menggantung atau gagal total. Tugas kelompok Anda adalah **merancang alur asynchronous berbasis message broker** yang decoupled, tahan gangguan, dan tetap dapat dilacak setiap saat.
+
+### Janji Layanan: Acceptance vs Completion
+
+Tentukan batasan tegas antara kapan request dinyatakan **diterima** (*acceptance*) dan kapan proses dinyatakan **selesai** (*completion*):
+- Status **HTTP 202 Accepted** bukan bukti proses bisnis telah selesai! HTTP 202 adalah janji pertanggungjawaban sistem bahwa data pengajuan telah terkunci di storage persisten (database lokal atau queue broker) dan siap diproses lebih lanjut.
+- Respons HTTP 202 wajib menyertakan identitas unik `pengajuanId` dan URL pelacakan status (misalnya `/pengajuan/SIM-001/status`).
+
+### Daftar Nama Domain Event Bersama
+
+Gunakan nama domain event standar berikut:
+
+| Service Producer | Nama Event | Arti Bisnis |
 |---|---|---|
-| gateway | `pengajuan.diterima` | Pengajuan tersimpan dan diterima untuk diproses |
-| validasi | `pengajuan.valid` | Pemeriksaan berhasil |
-| validasi | `pengajuan.ditolak` | Pemeriksaan menghasilkan penolakan bisnis |
-| billing | `billing.terbit` | Kode billing tersimpan |
+| `gateway` | `pengajuan.diterima` | Pengajuan tersimpan durable di DB gateway dan siap diproses |
+| `validasi` | `pengajuan.valid` | Verifikasi berkas lolos persyaratan bisnis |
+| `validasi` | `pengajuan.ditolak` | Verifikasi berkas tidak memenuhi syarat (penolakan bisnis) |
+| `billing` | `billing.terbit` | Kode bayar berhasil diterbitkan dan tersimpan di DB billing |
 
-Event baru hanya ditambahkan jika ada kebutuhan dan pemiliknya jelas. Pilih
-exchange dan queue sendiri; gunakan salah satu dari empat tipe yang telah
-dipelajari. Nama resource SIMPEL tidak harus menyalin prefix `lab1.`.
-Desain ini belum mengubah skeleton layanan; implementasinya dimulai MP-06.
+> Penamaan resource queue dan exchange tidak wajib memakai prefix `lab1.`. Kelompok bebas memilih nama exchange dan antrean yang relevan (misalnya Topic Exchange `simpel.events`).
 
-## Langkah dan waktu
+---
 
-| Menit | Tugas | Bukti yang harus tampak |
+## Alokasi Waktu Praktik (45 Menit)
+
+| Waktu | Tahapan Kerja | Target Output yang Harus Terlihat |
 |---|---|---|
-| 0–5 | Bagi peran: fasilitator, pencatat, penantang, penyaji | Nama kelompok; batas proses dan kebutuhan |
-| 5–15 | Gambar alur sukses, status, dan pemilik data | Gateway, exchange, queue, consumer; balasan HTTP terpisah |
-| 15–25 | Isi routing dan kontrak satu event | Event → exchange/type → key → queue → consumer; JSON minimum |
-| 25–35 | Uji tiga kartu gangguan di bawah | Tindakan, status pengguna, pemilik pemulihan, bukti selesai |
-| 35–42 | Tukar rancangan dengan kelompok lain | Satu celah ditemukan; satu keputusan diperbaiki |
-| 42–45 | Kumpulkan dan simpulkan | Satu halaman, satu alasan pemilihan broker, satu risiko tersisa |
+| **0–5 m** | Bagi peran kelompok & rumuskan janji layanan | Fasilitator, Pencatat, Penantang, Penyaji; kriteria *accepted* vs *completed* |
+| **5–15 m** | Gambar diagram alur sukses (*happy path*) | Kotak service, exchange, queue, consumer, titik balasan HTTP 202, dan alur penolakan |
+| **15–25 m** | Lengkapi tabel routing & satu kontrak event | Tabel relasi Event $\rightarrow$ Exchange $\rightarrow$ Routing Key $\rightarrow$ Queue $\rightarrow$ Consumer; JSON envelope |
+| **25–35 m** | Uji ketahanan desain dengan 3 kartu gangguan | Tempat pesan menunggu, jadwal backoff retry, mekanisme idempotensi, pemilik DLQ |
+| **35–42 m** | Peer review silang antar-kelompok | Bertukar lembar kerja, temukan minimal 1 celah konkret, revisi 1 keputusan arsitektur |
+| **42–45 m** | Finalisasi & pengumpulan cetak biru | 1 lembar kerja, 1 keputusan utama + alasan, dan 1 risiko terbuka (*open risk*) |
 
-## Kontrak pesan minimum
+---
 
-Cantumkan `event`, `schemaVersion`, `messageId`, `correlationId`, `occurredAt`
-(UTC ISO 8601), dan `data.pengajuanId`. Tambahkan hanya data yang diperlukan
-consumer. Bedakan payload dari properti AMQP: identitas payload `messageId`
-dapat dipetakan ke `message_id`, dan `correlationId` ke `correlation_id`.
-Tentukan siapa membuat ID, apa yang tetap saat retry, dan bagaimana consumer
-menangani versi skema yang tidak didukung. Jangan memasukkan berkas dokumen,
-credential, atau data pribadi nyata ke contoh.
+## Standar Kontrak Event Minimum (Envelope JSON)
 
-## Kartu gangguan
+Tuliskan satu kontrak event lengkap (disarankan `pengajuan.valid` atau `billing.terbit`) dengan format envelope standar:
 
-1. **Billing tidak tersedia 10 menit.** Apa yang tetap diterima? Di mana pekerjaan
-   menunggu? Berapa retry dan jedanya? Kapan eskalasi? Status apa yang terlihat?
-2. **Notifikasi memerlukan 3 detik per pesan.** Mengapa validasi/billing tidak ikut
-   menunggu? Apakah perlu queue sendiri atau cukup worker tambahan? Bagaimana
-   membedakan billing selesai dari notifikasi belum terkirim?
-3. **Event yang sama terkirim dua kali.** Consumer crash setelah commit DB tetapi
-   sebelum ack. Apa kunci deduplikasi? Bagaimana mencegah dua kode billing?
-   Mengapa memeriksa flag `redelivered` saja tidak cukup?
+```json
+{
+  "event": "pengajuan.valid",
+  "schemaVersion": 1,
+  "messageId": "evt-002",
+  "correlationId": "corr-001",
+  "occurredAt": "2026-09-15T03:00:00Z",
+  "data": {
+    "pengajuanId": "SIM-001"
+  }
+}
+```
 
-Tuliskan juga penanganan payload rusak: jangan retry tanpa batas. DLQ harus
-memiliki pemilik pemeriksaan dan prosedur redrive setelah penyebab diperbaiki.
-Mekanisme retry/DLQ akan dibangun pada MP-07; saat ini cukup rancangan eksplisit.
+**Ketentuan Kontrak:**
+- Cantumkan `event`, `schemaVersion`, `messageId`, `correlationId`, `occurredAt` (format UTC ISO-8601), dan objek `data`.
+- Pisahkan antara metadata aplikasi dan properti protokol: `messageId` dapat dipetakan ke AMQP property `message_id`, dan `correlationId` ke `correlation_id`.
+- Jangan pernah memasukkan binary file dokumen, password, atau credential sensitif ke dalam payload event broker! Gunakan *claim check pattern* (hanya kirim referensi ID atau URL aman).
 
-## Tinjauan sejawat dan penilaian
+---
 
-Nilai tiap aspek 0 = tidak ada, 1 = ada tetapi belum konsisten, 2 = konsisten
-dan bisa diuji. Total maksimum 10; gunakan untuk umpan balik, bukan nilai resmi.
+## Tiga Kartu Gangguan (Break Testing)
 
-| Aspek | Pertanyaan tinjauan |
+Uji desain arsitektur kelompok Anda terhadap tiga skenario insiden:
+
+1. **Kartu 1: Service Billing mengalami downtime selama 10 menit.**
+   - Di mana pesan pengajuan menunggu? (Queue billing atau outbox?).
+   - Bagaimana jadwal backoff retry bertingkatnya? (Contoh: jeda 30 detik, 120 detik, 600 detik).
+   - Apa yang dilihat pemohon saat membuka halaman status?
+   - Siapa yang bertanggung jawab jika batas retry habis dan pesan masuk ke DLQ?
+2. **Kartu 2: Service Notifikasi lambat (latensi pihak ketiga ~3 detik per pesan).**
+   - Mengapa kelambatan notifikasi tidak menahan laju pemrosesan billing atau validasi? (Pemisahan queue independen).
+   - Apakah status pengajuan di pemohon ikut tertahan?
+3. **Kartu 3: Redelivery event duplikat (worker crash setelah commit DB tapi sebelum kirim ack).**
+   - Apa kunci idempotensi yang digunakan? (Tabel deduplikasi `(consumer_name, message_id)`).
+   - Bagaimana skema database bisnis mencegah terbitnya dua kode pembayaran? (Unique constraint pada `pengajuan_id`).
+   - Mengapa pengecekan flag `redelivered` dari broker saja tidak cukup?
+
+---
+
+## Panduan Peer Review dan Evaluasi
+
+Gunakan rubrik skor sederhana (0 = belum ada, 1 = ada tetapi belum konsisten, 2 = solid dan dapat diuji; Total Maksimum: 10):
+
+| Aspek Penilaian | Pertanyaan Penguji |
 |---|---|
-| Kebutuhan/status | Apakah diterima, selesai, ditolak, dan tertunda dibedakan? |
-| Topologi | Apakah setiap event mencapai consumer yang tepat tanpa dua layanan berebut satu queue? |
-| Kontrak | Apakah identitas, versi, waktu, data minimum, dan pemilik event jelas? |
-| Kegagalan | Apakah retry terbatas, idempotensi, DLQ, dan pemilik pemulihan menjawab tiga kartu? |
-| Pembuktian | Apakah ada langkah dan hasil yang diharapkan untuk alur sukses serta gangguan? |
+| **1. Acceptance & Status** | Apakah batas penerimaan durable dipisahkan dari akhir proses bisnis? |
+| **2. Topologi Routing** | Apakah setiap event sampai ke consumer yang tepat tanpa dua service berebut satu queue? |
+| **3. Kontrak Event** | Apakah skema envelope, identitas unik, versi, dan data minimum terdefinisi jelas? |
+| **4. Penanganan Kegagalan** | Apakah retry berbatas, strategi idempotensi, dan kepemilikan DLQ menjawab 3 kartu gangguan? |
+| **5. Pembuktian & Pengujian** | Apakah terdapat rencana pengujian konkret untuk memvalidasi alur sukses dan alur recovery? |
 
-Simpan sebagai `lab2-<kelompok>.pdf` atau `.md`, beserta diagram jika terpisah.
-Gunakan kembali pada MP-06–08 dan action learning/capstone. Contoh pengajar
-dibahas setelah pertukaran rancangan, bukan sebagai template untuk disalin.
+Simpan hasil kerja kelompok dengan nama `lab2-<nama-kelompok>.pdf` atau `.md`. Cetak biru ini akan digunakan kembali saat praktik implementasi producer-consumer di MP-06 sampai MP-08.

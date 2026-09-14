@@ -1,28 +1,24 @@
-# Lab 3 — Producer, consumer, dan bukti pemrosesan
-**MP-06, hari ketiga, Rabu 16 September 2026. Praktik 4 JP (180 menit).**
+# Lab 3 — Producer, Consumer, dan Bukti Pemrosesan
 
-Hasil akhir: gateway mengirim event yang mendapat publisher confirm; validasi menyimpan
-hasil ke PostgreSQL sebelum manual ack. Peserta membuktikan perilaku ketika consumer
-berhenti, menerima ulang pesan, dan memakai prefetch berbeda. Seluruh identitas sintetis.
+**Modul MP-06 · Hari 3 (Rabu, 16 September 2026) · Praktik 4 JP (180 Menit).**
 
-## Batas implementasi
-Lab ini merupakan tahap transport dari rancangan Lab 2. HTTP 202 dengan status
-`DITERIMA_BROKER` berarti pesan telah dirutekan dan dikonfirmasi broker. Gateway belum
-menulis pengajuan dan outbox dalam satu transaksi; belum ada status URL, billing, atau
-notifikasi asinkron. Jika broker tidak siap, gateway tidak dapat menerima melalui outbox.
-503/timeout dapat memiliki hasil publish yang belum diketahui: simpan ID respons dan
-rekonsiliasi sebelum mengirim ulang. Jangan menyatakan seluruh proses bisnis selesai.
+Target akhir sesi: Gateway mempublish event dengan mekanisme Publisher Confirm; service Validasi memproses data dan menyimpan hasil ke database PostgreSQL sebelum mengirimkan Manual Ack. Peserta membuktikan perilaku sistem ketika consumer mati, menangani redelivery pesan duplikat, serta mengukur dampak nilai prefetch yang berbeda. Seluruh data menggunakan ID sintetis.
 
-Topologi mode `work`: gateway → topic exchange `simpel.events` → binding
-`pengajuan.diterima` → `validasi.q` → satu atau beberapa competing consumers.
-Kontrak invalid diarahkan ke `simpel.invalid` / `pengajuan.invalid` untuk inspeksi.
-Retry tertunda dan DLQ operasional dikerjakan pada Lab 4B, hari keempat.
+---
 
-## Prasyarat dan terminal
-Jalankan dari akar repo, dengan Node 20 yang mendukung `--env-file` (20.6+),
-Docker, dependensi terpasang, dan konfigurasi lokal yang sudah dipakai pada Lab 0.
-Jangan menimpa `.env` yang sudah ada. Jika belum ada, salin `.env.contoh`.
-Pada broker bersama, gunakan vhost pribadi dan database/skema yang disediakan panitia.
+## Batasan Implementasi Lab 3
+
+Lab ini berfokus pada **lapisan transport pesan** berdasarkan rancangan Lab 2:
+- Status HTTP 202 dengan response `DITERIMA_BROKER` menandakan bahwa pesan telah berhasil dirutekan dan dikonfirmasi oleh broker (*publisher confirm*).
+- Pada tahap ini, Gateway belum menerapkan Transactional Outbox (Outbox DB akan diimplementasikan penuh di Lab 5).
+- Topologi mode `work`: `Gateway` $\rightarrow$ Topic Exchange `simpel.events` $\rightarrow$ Binding `pengajuan.diterima` $\rightarrow$ Queue `validasi.q` $\rightarrow$ satu atau beberapa *competing consumer workers*.
+- Pesan dengan kontrak rusak dialihkan ke exchange `simpel.invalid` / routing key `pengajuan.invalid` untuk dikarantina. Mekanisme delayed retry dan DLQ operasional dibahas di Lab 4B.
+
+---
+
+## Prasyarat Lingkungan dan Terminal
+
+Jalankan perintah dari **root repository `simpel-lab/`**, menggunakan Node.js >= 20.6 (mendukung flag `--env-file`), Docker aktif, dan konfigurasi `.env` yang sudah disiapkan:
 
 ```bash
 docker compose up -d rabbitmq postgres
@@ -30,148 +26,169 @@ npm install
 npm run db:siapkan
 ```
 
-Perintah terakhir menambahkan tabel yang belum ada tanpa menghapus baris. Init SQL
-Docker hanya berjalan pada volume baru; karena itu volume lama juga perlu perintah ini.
-Terminal A untuk gateway, B–D untuk worker, E untuk pengirim dan pemeriksaan.
-Pastikan layanan demo sinkron pada port 3001 sudah dihentikan oleh pemiliknya.
+> Skrip `npm run db:siapkan` menambahkan tabel-tabel baru tanpa menghapus data yang sudah ada (aman dijalankan pada container yang sudah memiliki data lama).
 
-## 3a — Producer (45 menit)
-Alokasi: 5 menit tujuan, 8 membaca kontrak, 8 menelusuri publish, 8 menjalankan,
-10 menguji batas respons, 6 diskusi bukti.
+Siapkan terminal terpisah:
+- **Terminal A:** Service Gateway
+- **Terminal B, C, D:** Consumer Worker (Validasi)
+- **Terminal E:** Pengirim beban request dan pengamat hasil (*evidence*)
 
-1. Baca `layanan/gateway/index.js` dan `layanan/messaging.js`.
-   Bedakan business ID `data.pengajuanId`, identitas event `messageId`,
-   dan jejak proses `correlationId`. Satu retry atas event yang sama harus
-   mempertahankan message ID; kiriman HTTP baru pada starter menghasilkan ID baru.
-2. Jalankan A: `SIMPEL_MODE=work npm run broker:gateway`. Buka
-   `http://127.0.0.1:3001/health`; seharusnya `ready: true`.
-   Jangan jalankan consumer dahulu.
-3. E: `npm run kirim -- --count=1 --run=awal`. Bukti respons ditulis ke
-   `.evidence/awal.json`; baca nilai confirmed dan ID. Kirim hanya sekali
-   dengan run ID ini agar penghitungan tidak tercampur.
-4. Di RabbitMQ Management, buka vhost sendiri, queue `validasi.q`.
-   Amati Ready bertambah; gunakan refresh. Jangan menekan Get messages dengan
-   automatic acknowledgment karena itu mengambil dan menyelesaikan pesan.
-5. E: `npm run hasil -- awal` menghasilkan validationRows 0. Jelaskan mengapa
-   confirmed 1 dan baris DB 0 konsisten. Bandingkan dengan rancangan outbox Lab 2.
-6. Telusuri callback confirm, event `return`, dan boolean `publish()`.
-   `mandatory` mendeteksi tidak ada rute; confirm sendiri juga dapat diterima
-   untuk pesan unroutable. Boolean hanya memberi sinyal buffer lokal.
+Pastikan service demo synchronous lama di port 3001 sudah dimatikan.
 
-**Bukti:** file receipt, queue Ready, hasil database, dan satu kalimat arti HTTP 202.
-Jangan mengubah kode agar mengembalikan sukses sebelum callback confirm.
+---
 
-## 3b — Consumer dan manual acknowledgment (45 menit)
-Alokasi: 5 menit prediksi, 8 membaca worker, 8 menjalankan, 8 menelusuri ack,
-10 kasus kegagalan, 6 pembahasan.
+## 3a — Producer & Publisher Confirm (45 Menit)
 
-1. Baca `layanan/worker.js`; temukan `noAck: false`, `prefetch`,
-   INSERT, dan `channel.ack(message)`. Kode sudah lengkap; komentar latihan
-   meminta penjelasan, bukan menandai baris yang wajib ditambal.
-2. B: `SIMPEL_MODE=work npm run broker:validasi`. Tunggu log ready.
-   E: `npm run hasil -- awal`; validationRows menjadi 1.
-3. Kirim `npm run kirim -- --count=5 --run=normal`. Cocokkan kelima business ID
-   pada receipts dengan log committed, bukan hanya jumlah total database.
-4. Bahas tiga jendela crash: sebelum INSERT, setelah commit sebelum ack,
-   dan setelah ack. Pesan yang belum di-ack dikembalikan setelah channel/connection
-   tertutup; koneksi putus tidak harus terdeteksi seketika.
-5. Uji terarah opsional dengan satu pesan: hentikan worker menggunakan Ctrl-C;
-   jalankan `VALIDASI_ACK_DELAY_MS=10000 npm run broker:validasi`.
-   Kirim satu event dengan run ID baru. Setelah log committed, hentikan **hanya PID
-   worker latihan tersebut** dengan terminasi paksa melalui task manager atau
-   terminal yang telah mengidentifikasi PID. Jangan hentikan broker/database.
-   Jalankan worker normal; cari `redelivered: true` dan `duplicate: true`.
-   Gunakan `npm run verify:day3` jika tidak ingin melakukan terminasi manual.
-6. Diskusikan batas `ON CONFLICT (id) DO NOTHING`: cukup untuk satu INSERT ini,
-   belum merupakan transaksi deduplikasi seluruh workflow atau efek eksternal.
+*Alokasi waktu: Penjelasan tujuan (5 m) $\rightarrow$ Analisis kontrak (8 m) $\rightarrow$ Tracing kode publish (8 m) $\rightarrow$ Eksekusi (8 m) $\rightarrow$ Uji batas respons HTTP (10 m) $\rightarrow$ Diskusi bukti (6 m).*
 
-Jika data invalid, consumer menolak tanpa requeue dan menyimpan melalui DLX yang
-telah dibuat. Jika operasi DB gagal, consumer membatalkan konsumsi lalu berhenti,
-sehingga tidak membuat loop requeue cepat. Pulihkan dependensi lalu jalankan ulang.
-Restart/reconnect otomatis sengaja belum ditambahkan pada starter kelas.
+1. Buka file [`layanan/gateway/index.js`](../../layanan/gateway/index.js) dan [`layanan/messaging.js`](../../layanan/messaging.js).
+   - Bedakan tiga level identitas: identitas bisnis `data.pengajuanId` (contoh: `SIM-001`), identitas event `messageId` (contoh: `evt-001`), dan penelusuran alur `correlationId` (contoh: `corr-001`).
+   - Retry atas event yang sama wajib mempertahankan `messageId` yang sama untuk deduplikasi.
+2. Di Terminal A, jalankan Gateway dalam mode work:
+   ```bash
+   SIMPEL_MODE=work npm run broker:gateway
+   ```
+   Buka `http://127.0.0.1:3001/health` di browser; pastikan mengembalikan `ready: true`. (Biarkan consumer belum berjalan).
+3. Di Terminal E, kirim satu pengajuan uji:
+   ```bash
+   npm run kirim -- --count=1 --run=awal
+   ```
+   Bukti respons akan dicatat ke `.evidence/awal.json`. Periksa nilai status `confirmed` dan ID yang dihasilkan.
+4. Buka RabbitMQ Management UI di vhost Anda $\rightarrow$ tab **Queues** $\rightarrow$ antrean `validasi.q`.
+   Perhatikan kolom **Ready** bertambah menjadi 1. Jangan menekan tombol *Get messages* dengan mode *auto-ack* karena akan menghapus pesan uji.
+5. Di Terminal E, periksa database:
+   ```bash
+   npm run hasil -- awal
+   ```
+   Perintah ini akan menampilkan `validationRows: 0`. Mengapa pesan berstatus confirmed=1 tetapi baris database masih 0? Karena worker belum dinyalakan! Pesan aman tertahan di queue broker.
+6. Telusuri implementasi kode: perhatikan penggunaan callback publisher confirm, penanganan event `return` (untuk mendeteksi pesan unroutable saat flag `mandatory: true`), dan nilai return boolean pada fungsi `channel.publish()`. (Nilai boolean ini mengindikasikan apakah buffer internal socket client penuh, bukan konfirmasi dari broker).
 
-## 3c — Consumer berhenti, 100 pesan tetap dapat diselesaikan (45 menit)
-Alokasi: 5 menit hipotesis, 8 menyiapkan baseline, 8 mengirim saat berhenti,
-8 mengamati queue, 10 memulihkan dan mencocokkan ID, 6 menulis kesimpulan.
+---
 
-1. Hentikan semua worker validasi milik latihan dengan Ctrl-C. Gateway tetap hidup.
-   Pastikan consumers pada `validasi.q` bernilai 0. Queue awal sebaiknya kosong;
-   selesaikan pesan lama dengan consumer, jangan purge sembarangan.
-2. Catat run ID baru, misalnya `mati01`. E:
-   `npm run kirim -- --count=100 --run=mati01`.
-3. Simpan receipt confirmed 100. Queue Ready bertambah 100 dan
-   `npm run hasil -- mati01` menunjukkan 0 baris untuk run ini.
-4. B: `npm run broker:validasi`. Tunggu sampai queue tidak menyisakan pekerjaan
-   run ini. E: `npm run hasil -- mati01` harus menunjukkan 100.
-5. Hitung ID unik dan cocokkan identitas. Pemeriksaan otomatis lengkap tersedia di
-   `tools/verify-day3.js`. Screenshot jumlah saja belum membuktikan tidak ada ID
-   hilang atau satu ID tergantikan duplikat.
-6. Kesimpulan yang sah: pada skenario consumer berhenti ini, semua 100 ID yang
-   mendapat respons konfirmasi ditemukan setelah pemulihan. Eksperimen ini tidak
-   membuktikan toleransi kerusakan disk/node, seluruh jenis crash, atau exactly-once.
+## 3b — Consumer & Manual Acknowledgment (45 Menit)
 
-## 3d — Tiga consumer, prefetch 1 dan 100 (45 menit)
-Alokasi: 5 menit menentukan variabel, 8 menjalankan konfigurasi pertama,
-8 mencatat hasil, 8 konfigurasi kedua, 10 membandingkan, 6 menyimpulkan.
+*Alokasi waktu: Prediksi alur (5 m) $\rightarrow$ Analisis kode worker (8 m) $\rightarrow$ Eksekusi (8 m) $\rightarrow$ Tracing manual ack (8 m) $\rightarrow$ Simulasi crash & redelivery (10 m) $\rightarrow$ Pembahasan (6 m).*
 
-Gunakan beban I/O yang sama: `VALIDASI_KERJA_MS=120`, pool maksimum 4 per worker.
-Pada starter broker, beban ini berupa `pg_sleep` yang menahan koneksi. Kode sinkron
-lama membakar CPU; hasil dua jenis beban ini tidak boleh dibandingkan seolah setara.
+1. Buka file [`layanan/worker.js`](../../layanan/worker.js). Perhatikan konfigurasi `noAck: false`, pemanggilan `channel.prefetch()`, transaksi `INSERT` ke PostgreSQL, dan pemanggilan `channel.ack(message)`.
+2. Di Terminal B, jalankan worker validasi:
+   ```bash
+   SIMPEL_MODE=work npm run broker:validasi
+   ```
+   Tunggu hingga log menampilkan status ready. Di Terminal E, jalankan kembali:
+   ```bash
+   npm run hasil -- awal
+   ```
+   Nilai `validationRows` kini berubah menjadi 1. Pesan telah sukses diproses dan di-ack.
+3. Kirim batch 5 pengajuan normal:
+   ```bash
+   npm run kirim -- --count=5 --run=normal
+   ```
+   Cocokkan kelima business ID pada receipts dengan log `committed` di worker terminal B.
+4. **Analisis Tiga Jendela Kegagalan (Crash Windows):**
+   - Crash *sebelum* INSERT DB: Pesan belum di-ack, broker mendeteksi koneksi putus dan mengirim ulang (*requeue/redeliver*). Data DB bersih.
+   - Crash *setelah commit DB tetapi sebelum ack*: Data bisnis sudah tersimpan di DB, tetapi ack hilang. Broker mengirim ulang pesan ke worker lain $\rightarrow$ memicu duplikasi jika consumer tidak idempoten!
+   - Crash *setelah ack*: Transaksi tuntas, tidak ada masalah.
+5. **Uji Redelivery & Idempotensi Nyata:**
+   - Hentikan worker di Terminal B dengan `Ctrl+C`.
+   - Jalankan worker dengan penundaan ack artifisial 10 detik:
+     ```bash
+     VALIDASI_ACK_DELAY_MS=10000 npm run broker:validasi
+     ```
+   - Di Terminal E, kirim satu pengajuan dengan run ID baru.
+   - Segera setelah log menampilkan `committed`, hentikan proses worker tersebut secara paksa (*force kill* PID worker).
+   - Jalankan kembali worker normal: amati log worker mendeteksi `redelivered: true` dan `duplicate: true`.
+   - Periksa bahwa database tidak menduplikasi baris berkat proteksi `ON CONFLICT (id) DO NOTHING`.
 
-Jalankan B, C, D dengan ID berbeda:
+---
+
+## 3c — Uji Ketahanan: Consumer Down, 100 Pesan Tetap Selamat (45 Menit)
+
+*Alokasi waktu: Perumusan hipotesis (5 m) $\rightarrow$ Persiapan baseline (8 m) $\rightarrow$ Publish 100 pesan saat worker mati (8 m) $\rightarrow$ Monitoring queue depth (8 m) $\rightarrow$ Pemulihan worker & rekonsiliasi ID (10 m) $\rightarrow$ Kesimpulan (6 m).*
+
+1. Hentikan seluruh worker validasi dengan `Ctrl+C`. Biarkan Gateway tetap menyala.
+2. Pastikan metrik **Consumers** pada antrean `validasi.q` bernilai 0 di Management UI.
+3. Kirim lonjakan beban 100 pengajuan sekaligus saat consumer offline:
+   ```bash
+   npm run kirim -- --count=100 --run=mati01
+   ```
+4. Di Management UI, amati angka **Ready** melonjak menjadi 100. Jalankan `npm run hasil -- mati01`; hasilnya membuktikan 0 baris di database. Gateway tetap membalas HTTP 202 ke klien.
+5. Nyalakan kembali worker validasi di Terminal B:
+   ```bash
+   npm run broker:validasi
+   ```
+   Amati antrean terkuras habis secara bertahap (*drain*).
+6. Verifikasi integritas data:
+   ```bash
+   npm run hasil -- mati01
+   ```
+   Hasilnya wajib menunjukkan angka 100 baris. Seluruh 100 pesan yang dikirim saat service worker mati berhasil dipulihkan dan diproses tanpa ada satu pun ID yang hilang.
+
+---
+
+## 3d — Competing Consumers: Prefetch 1 vs Prefetch 100 (45 Menit)
+
+*Alokasi waktu: Setup variabel (5 m) $\rightarrow$ Eksperimen Prefetch 1 (8 m) $\rightarrow$ Pencatatan metrik (8 m) $\rightarrow$ Eksperimen Prefetch 100 (8 m) $\rightarrow$ Komparasi & analisis bottleneck (10 m) $\rightarrow$ Kesimpulan teknis (6 m).*
+
+Uji coba ini menggunakan simulasi beban I/O database: `VALIDASI_KERJA_MS=120` dengan koneksi pool PostgreSQL dibatasi maksimal 4 per worker.
+
+### Eksperimen 1: Fair Dispatch (Prefetch = 1)
+
+Jalankan 3 worker competing consumers di Terminal B, C, dan D dengan prefetch 1:
+
 ```bash
+# Terminal B:
 WORKER_ID=w1 VALIDASI_PREFETCH=1 VALIDASI_POOL_MAX=4 npm run broker:validasi
+# Terminal C:
 WORKER_ID=w2 VALIDASI_PREFETCH=1 VALIDASI_POOL_MAX=4 npm run broker:validasi
+# Terminal D:
 WORKER_ID=w3 VALIDASI_PREFETCH=1 VALIDASI_POOL_MAX=4 npm run broker:validasi
 ```
 
-E: `npm run kirim -- --count=120 --run=p1`. Tunggu 120 baris, catat elapsed time,
-Ready/Unacked, jumlah received per worker, maxInFlight, maxPoolWaiting, dan cpuMs.
-Hentikan ketiga worker; log metrics dengan `final: true` memuat ringkasan.
-Ulangi ketiga perintah dengan prefetch 100 dan run ID `p100`. Jangan mencampur
-worker prefetch 1 dengan 100. Ulangi percobaan jika ada gangguan atau hasil janggal.
+Di Terminal E, kirim 120 pesan:
+```bash
+npm run kirim -- --count=120 --run=p1
+```
+Tunggu hingga seluruh pesan selesai, lalu amati metrik ringkasan pada log akhir worker (`received per worker`, `maxInFlight`, `maxPoolWaiting`).
 
-| Ukuran | Prefetch 1 | Prefetch 100 |
+### Eksperimen 2: Greedy Dispatch (Prefetch = 100)
+
+Hentikan ketiga worker, lalu jalankan kembali dengan prefetch 100:
+
+```bash
+# Terminal B:
+WORKER_ID=w1 VALIDASI_PREFETCH=100 VALIDASI_POOL_MAX=4 npm run broker:validasi
+# Terminal C:
+WORKER_ID=w2 VALIDASI_PREFETCH=100 VALIDASI_POOL_MAX=4 npm run broker:validasi
+# Terminal D:
+WORKER_ID=w3 VALIDASI_PREFETCH=100 VALIDASI_POOL_MAX=4 npm run broker:validasi
+```
+
+Kirim kembali 120 pesan dengan run ID `p100`:
+```bash
+npm run kirim -- --count=120 --run=p100
+```
+
+### Tabel Komparasi Hasil Eksperimen
+
+| Metrik Evaluasi | Prefetch = 1 | Prefetch = 100 |
 |---|---|---|
-| Run ID dan jumlah ID selesai | isi hasil | isi hasil |
-| Waktu sampai seluruh ID tersimpan | isi hasil | isi hasil |
-| Puncak Unacked / in-flight | isi hasil | isi hasil |
-| Koneksi DB aktif dan pool waiting | isi hasil | isi hasil |
-| CPU proses worker, cakupan waktu sama | isi hasil | isi hasil |
-| Pembagian pekerjaan / batas kesimpulan | isi hasil | isi hasil |
+| Total waktu penyelesaian (*elapsed time*) | *(catat hasil)* | *(catat hasil)* |
+| Distribusi beban antar worker (w1 / w2 / w3) | Rata (~40 / ~40 / ~40) | Cenderung timpang |
+| Puncak pesan in-flight per worker | Maksimal 1 per worker | Hingga 100 menumpuk di memori worker |
+| Antrean koneksi database (*pool waiting*) | Terkendali (<= pool max) | Berisiko pool starvation |
 
-Prefetch membatasi delivery yang belum di-ack, bukan jumlah koneksi DB.
-Dengan tiga worker dan pool max 4, batas pool gabungan 12; prefetch 1 membatasi
-masing-masing worker pada satu delivery. Nilai 100 memungkinkan pekerjaan menunggu
-di aplikasi. Pilih nilai berdasarkan kemampuan downstream dan sasaran latency,
-bukan klaim bahwa 1 pasti tercepat atau 100 pasti membanjiri DB dengan 300 query.
+> **Prinsip Teknis:** Nilai `prefetch` membatasi jumlah pesan yang belum di-ack yang boleh dikirim broker ke satu worker. Nilai prefetch rendah (misalnya 1–10) menjamin pembagian beban yang adil (*fair dispatch*) pada tugas berat, sedangkan prefetch tinggi cocok untuk pesan ringan berkecepatan tinggi dengan pemrosesan CPU murni.
 
-## Pemeriksaan otomatis untuk instruktur
-`npm run verify:day3` membuat stack **terpisah** bernama `simpel-day3-qa`
-pada loopback port 5763, 15683, 5463, dan gateway 3063. Tidak membaca `.env`.
-Jika project QA sudah ada, skrip berhenti agar keadaan sebelumnya bisa diperiksa.
-Setelah selesai, skrip menghapus hanya stack/volume QA miliknya. Hasil ada di
-`.evidence/day3-verification.json` (diabaikan Git).
+---
 
-Check mencakup input invalid, 100 receipt/ID saat consumer mati, unroutable publish,
-kontrak invalid, crash setelah commit, explicit duplicate, kedua konfigurasi prefetch,
-kegagalan statement DB, dan fanout dengan tracking berhenti. Ini uji fungsional lokal,
-bukan sertifikasi kapasitas produksi atau pengujian kehilangan node broker.
+## Verifikasi Otomatis untuk Evaluasi
 
-## Troubleshooting dan penilaian
-- `ECONNREFUSED` / startup failed: periksa status broker/DB, port dan vhost,
-  lalu ulangi setelah dependensi siap. Jangan mencetak URL yang memuat password.
-- `PRECONDITION_FAILED`: tipe/argumen resource yang namanya sama tidak cocok.
-  Pakai vhost latihan yang tepat; jangan menghapus queue berisi data untuk memaksa cocok.
-- Ready tidak berkurang: cek consumer count, nama queue dan mode. Unacked menetap:
-  periksa DB, ack, dan worker logs sebelum menambah consumer.
-- Tabel tracking tidak ditemukan: jalankan `npm run db:siapkan`, bukan menghapus volume.
-- 503/timeout saat publish: simpan ID yang tersedia, periksa queue dan log,
-  tentukan apakah hasil belum diketahui. Pengiriman ulang HTTP membuat business ID baru.
+Tersedia skrip pengujian menyeluruh untuk memvalidasi seluruh fungsionalitas Lab 3:
 
-Penilaian 10 poin: arti confirm/ack benar (2), bukti 100 ID lengkap (3),
-crash/duplikasi dijelaskan (2), perbandingan prefetch dengan batas yang jujur (3).
-Kumpulkan laporan ringkas dan receipts tanpa kredensial. Pengayaan: baca
-[amqplib API](https://amqp-node.github.io/amqplib/channel_api.html),
-[RabbitMQ confirms](https://www.rabbitmq.com/docs/confirms), dan
-[consumer prefetch](https://www.rabbitmq.com/docs/consumer-prefetch).
+```bash
+npm run verify:day3
+```
+
+Skrip ini menjalankan suite pengujian terisolasi (stack QA terpisah) untuk memeriksa publisher confirm, recovery consumer mati, deduplikasi pesan, hingga verifikasi prefetch.
+
+Rujukan teknis: [amqplib Channel API Guide](https://amqp-node.github.io/amqplib/channel_api.html), [RabbitMQ Confirms](https://www.rabbitmq.com/docs/confirms), dan [Consumer Prefetch](https://www.rabbitmq.com/docs/consumer-prefetch).

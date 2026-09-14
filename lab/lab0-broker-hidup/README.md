@@ -1,129 +1,129 @@
-# Lab 0 — Broker Hidup
+# Lab 0 — Verifikasi Broker Hidup
 
-**Sesi:** MP-3.3 (13.00–15.15, Hari 1) · **Durasi:** 45 menit · **Tanpa kode.**
+**Sesi:** MP-03.3 (13.00–15.15, Hari 1) · **Durasi:** 45 menit · **Tanpa kode program.**
 
-Tujuan lab ini cuma satu: **memastikan semua orang punya RabbitMQ yang benar-benar hidup**, dan melihat sendiri bentuk queue, exchange, serta pesan lewat Management UI — sebelum menyentuh satu baris kode Node.js pun. Ini gerbang seluruh 27 JP praktik yang tersisa, jadi jangan buru-buru.
+Tujuan lab ini sangat jelas: **memastikan setiap peserta memiliki instance RabbitMQ yang benar-benar aktif dan sehat di laptop masing-masing**, serta memahami secara langsung wujud queue, exchange, dan pesan melalui RabbitMQ Management UI sebelum kita menulis kode Node.js di modul-modul berikutnya. Sesi ini adalah fondasi awal untuk seluruh rangkaian 27 JP praktik ke depan.
 
-Kalau di langkah mana pun Anda macet, **angkat tangan** — jangan mencoba memperbaiki sendiri lebih dari 2 menit. Ada broker cadangan kalau laptop Anda benar-benar tidak bisa dipakai (lihat bagian paling bawah).
+Jika di langkah mana pun Anda mengalami kendala teknis, **segera beri tahu instruktur di chat atau gunakan fitur raise hand** — jangan mencoba mengotak-atik sendiri lebih dari 2 menit agar waktu praktik tidak habis.
 
 ---
 
-## Langkah 1 — Nyalakan broker
+## Langkah 1 — Jalankan Container Broker
 
-Dari folder `simpel-lab/` (harusnya sudah `docker compose up -d rabbitmq postgres` sejak H-1 sesuai PANDUAN-SETUP.md, tapi ulangi saja untuk memastikan):
+Buka terminal di root direktori `simpel-lab/`, lalu jalankan:
 
 ```bash
 docker compose up -d rabbitmq postgres
 ```
 
-Tunggu sampai statusnya sehat:
+Tunggu beberapa saat hingga container berstatus sehat:
 
 ```bash
 docker compose ps
 ```
 
-Anda harus melihat `simpel-rabbitmq` dengan status `Up ... (healthy)`. Kalau masih `starting`, tunggu 15–30 detik lagi lalu ulangi perintah di atas.
+Pastikan container `simpel-rabbitmq` menampilkan status `Up ... (healthy)`. Jika status masih `starting`, tunggu sekitar 15–30 detik lalu ulangi pengecekan status.
 
-**Kalau gagal di sini** — port bentrok, Docker Desktop belum jalan, dll — lihat bagian *Troubleshooting* di `../../PANDUAN-SETUP.md`. Jangan lanjut ke Langkah 2 sebelum statusnya `healthy`.
+> **Jika container gagal menyala** (misalnya port bentrok atau Docker Desktop belum berjalan), silakan periksa panduan *Troubleshooting* di [`../../PANDUAN-SETUP.md`](../../PANDUAN-SETUP.md). Jangan melanjutkan ke Langkah 2 sebelum status container dipastikan `healthy`.
 
 ---
 
-## Langkah 2 — Buka Management UI
+## Langkah 2 — Buka RabbitMQ Management UI
 
-Buka browser ke:
+Buka web browser dan akses:
 
-```
+```text
 http://localhost:15672
 ```
 
-Login dengan (dari file `.env` Anda, nilai bawaan):
+Login menggunakan kredensial default dari file `.env`:
 
 - **Username:** `simpel`
 - **Password:** `simpel123`
 
-Anda akan melihat dashboard dengan tab **Overview, Connections, Channels, Exchanges, Queues, Admin** di bagian atas.
-
-> Kalau memakai broker cadangan (lihat bagian bawah halaman ini), alamat dan kredensialnya berbeda — pakai yang dibagikan panitia, bukan yang di atas.
+Setelah login berhasil, Anda akan diarahkan ke halaman dashboard dengan tab navigasi: **Overview, Connections, Channels, Exchanges, Queues and Streams, Admin**.
 
 ---
 
-## Langkah 3 — Buat queue pertama Anda
+## Langkah 3 — Buat Queue Pertama
 
 1. Klik tab **Queues and Streams**.
-2. Klik **Add a new queue**.
-3. Isi:
-   - **Name:** `lab0.<nama-anda>` — misalnya `lab0.budi` (pakai nama Anda sendiri supaya tidak tabrakan dengan peserta lain, karena kita berbagi satu broker demo).
+2. Klik menu **Add a new queue**.
+3. Isi parameter antrean sebagai berikut:
+   - **Name:** `lab0.<nama-anda>` — contoh: `lab0.budi` (gunakan nama panggilan Anda sendiri agar unik).
    - **Type:** `Classic`
    - **Durability:** `Durable`
-4. Klik **Add queue**.
+4. Klik tombol **Add queue**.
 
-Anda akan diarahkan ke daftar queue dan melihat queue baru Anda dengan **Ready: 0, Unacked: 0, Total: 0**.
+Anda akan diarahkan kembali ke daftar antrean dan melihat queue baru Anda dengan metrik: **Ready: 0, Unacked: 0, Total: 0**.
 
 ---
 
-## Langkah 4 — Kirim pesan pertama lewat UI
+## Langkah 4 — Kirim Pesan Pertama via Management UI
 
-1. Klik nama queue Anda (`lab0.<nama-anda>`) untuk membuka detailnya.
+1. Klik nama queue Anda (`lab0.<nama-anda>`) untuk membuka halaman rincian antrean.
 2. Gulir ke bagian **Publish message**.
-3. Di kolom **Payload**, ketik pesan bebas, misalnya:
-   ```
+3. Pada kolom **Payload**, ketik pesan teks bebas, misalnya:
+   ```text
    Pengajuan SIUP dari Budi, kantor Jakarta
    ```
-4. Biarkan field lain apa adanya (Delivery mode `2 - Persistent` sudah default di RabbitMQ 4.x untuk publish lewat UI ini).
-5. Klik **Publish message**.
+4. Biarkan field lainnya apa adanya (properti Delivery mode `2 - Persistent` sudah menjadi default di RabbitMQ 4.x pada form UI ini).
+5. Klik tombol **Publish message**.
 
-Perhatikan **Ready** naik jadi `1`. Pesan Anda sekarang **tersimpan di disk broker**, menunggu diambil siapa pun yang mengonsumsinya — persis konsep *store-and-forward* yang baru dibahas di sesi 3.1. Matikan browser, matikan laptop sekalipun (broker tetap jalan di Docker) — pesan itu tidak hilang.
-
----
-
-## Langkah 5 — Ambil pesan itu kembali
-
-1. Masih di halaman queue yang sama, gulir ke bagian **Get messages**.
-2. Set **Messages** ke `1`, **Ack Mode** ke `Nack message requeue true` (supaya pesan kembali ke queue setelah dilihat — jangan sampai hilang untuk latihan berikutnya).
-3. Klik **Get Message(s)**.
-
-Anda akan melihat payload pesan yang tadi Anda kirim muncul di layar, lengkap dengan properti seperti `delivery_mode`, `routing_key`, dan `redelivered`. **Ready** kembali ke `1` karena kita memilih requeue.
-
-> Kalau Anda pilih **Ack Mode = "Automatic ack"**, pesan itu langsung hilang dari queue begitu diambil — itu normal, bukan bug. Baru dibahas tuntas di MP-3.2 (at-least-once vs auto-ack).
+Perhatikan bahwa angka **Ready** akan bertambah menjadi `1`. Pesan Anda sekarang **aman tersimpan di storage broker**, menunggu untuk dikonsumsi oleh worker — ini adalah implementasi nyata dari konsep *store-and-forward* yang dibahas pada teori MP-03. Meskipun browser ditutup atau container sempat di-restart, pesan persistent ini tidak akan hilang.
 
 ---
 
-## Langkah 6 — Kenali exchange default
+## Langkah 5 — Mengambil Pesan Kembali (Polling)
+
+1. Masih di halaman rincian queue yang sama, gulir ke bagian **Get messages**.
+2. Atur **Messages** ke `1`, dan ubah **Ack Mode** ke `Nack message requeue true` (agar pesan dikembalikan ke queue setelah dibaca untuk kebutuhan eksperimen).
+3. Klik tombol **Get Message(s)**.
+
+Payload pesan yang Anda kirim akan muncul di layar beserta metadata properti seperti `delivery_mode`, `routing_key`, dan flag `redelivered`. Nilai **Ready** tetap `1` karena kita memilih opsi requeue.
+
+> **Catatan:** Jika Anda memilih **Ack Mode = "Automatic ack"**, pesan tersebut akan langsung dihapus permanen dari antrean begitu ditarik oleh browser. Karakteristik ini akan dibahas tuntas di MP-03.2 dan MP-06 (*at-least-once delivery* vs *auto-ack*).
+
+---
+
+## Langkah 6 — Mengenal Default Exchange
 
 1. Klik tab **Exchanges**.
-2. Cari baris dengan nama **kosong** (`(AMQP default)`) di kolom Name.
+2. Perhatikan baris teratas dengan nama kosong (`(AMQP default)`) bertipe `direct`.
 
-Ini **default exchange** — jenis `direct` bawaan RabbitMQ yang otomatis mem-binding setiap queue ke dirinya sendiri memakai *nama queue sebagai routing key*. Inilah sebabnya `Publish message` di Langkah 4 tadi berhasil sampai walau Anda tidak pernah membuat binding manual: Anda menerbitkan lewat halaman queue, yang di baliknya memakai default exchange dengan routing key = nama queue itu sendiri.
+Ini adalah **Default Exchange** bawaan RabbitMQ. Exchange ini secara otomatis mengikat (*binding*) setiap queue baru ke dirinya sendiri dengan **routing key yang sama persis dengan nama queue**.
 
-Exchange lain seperti `amq.direct`, `amq.fanout`, `amq.topic` yang sudah ada di daftar adalah bawaan RabbitMQ — belum kita pakai, baru di Lab 1 (MP-4).
+Itulah sebabnya fitur *Publish message* di Langkah 4 tadi berhasil mengirim pesan ke queue meskipun Anda belum pernah membuat binding manual: secara internal, form UI tersebut mempublish pesan ke default exchange menggunakan routing key nama queue Anda.
 
----
-
-## Langkah 7 — Amati laju pesan (message rate)
-
-1. Kembali ke tab **Overview**.
-2. Lihat grafik **Message rates** di bagian atas.
-3. Ulangi Langkah 4 (publish) dan Langkah 5 (get) beberapa kali berturut-turut, sambil memperhatikan grafik ini.
-
-Anda akan melihat garis **publish** dan **deliver / get** naik setiap kali Anda melakukan aksi tersebut. Grafik yang sama persis inilah yang nanti dipakai instruktur untuk mendiagnosis "pesan menumpuk karena konsumen mati/lambat" di MP-10 (Troubleshooting).
+Exchange bawaan lainnya seperti `amq.direct`, `amq.fanout`, dan `amq.topic` adalah template standar AMQP yang akan kita eksplorasi lebih mendalam di Lab 1 (MP-04).
 
 ---
 
-## Selesai — daftar tilik
+## Langkah 7 — Mengamati Laju Pesan (Message Rates)
 
-Sebelum lanjut ke sesi berikutnya, pastikan Anda bisa menjawab **ya** untuk semua ini:
+1. Kembali ke tab navigasi **Overview**.
+2. Perhatikan grafik **Message rates** di bagian atas dashboard.
+3. Lakukan kembali Langkah 4 (publish) dan Langkah 5 (get) beberapa kali berturut-turut sambil mengamati grafik tersebut.
 
-- [ ] `docker compose ps` menunjukkan `simpel-rabbitmq` berstatus `healthy`.
-- [ ] Saya berhasil login ke Management UI (`http://localhost:15672`).
-- [ ] Saya berhasil membuat queue `lab0.<nama-anda>`.
-- [ ] Saya berhasil mengirim (publish) dan mengambil (get) satu pesan lewat UI.
-- [ ] Saya bisa menunjuk exchange default (`(AMQP default)`) di tab Exchanges.
-- [ ] Saya melihat grafik message rate bergerak saat saya publish/get.
-
-Kalau semua tercentang — broker Anda hidup dan siap untuk Lab 1 (MP-4, Hari 2) dan Lab 3 (MP-6, Hari 3) yang sudah memakai kode Node.js.
+Anda akan melihat kurva metrik **publish** dan **deliver / get** bergerak naik secara real-time. Grafik ini adalah metrik penting yang nanti akan kita pantau saat mengamati beban antrean dan mendiagnosis bottleneck di Lab 6 (Monitoring) dan Lab 7 (Troubleshooting).
 
 ---
 
-## Kalau broker lokal Anda tidak bisa dipakai
+## Checklist Verifikasi Mandiri
 
-Ikuti bagian **"Broker cadangan terpusat"** di `../../PANDUAN-SETUP.md`. Ganti alamat Management UI dan kredensial di atas dengan yang dibagikan panitia — langkah 3 sampai 7 di halaman ini tetap sama persis, hanya nama queue Anda yang wajib mengandung nama sendiri (`lab0.<nama-anda>`) supaya tidak bentrok dengan peserta lain yang berbagi broker yang sama.
+Sebelum mengakhiri sesi Lab 0, pastikan seluruh kriteria berikut terpenuhi:
+
+- [ ] Perintah `docker compose ps` menampilkan container `simpel-rabbitmq` berstatus `healthy`.
+- [ ] Berhasil login ke RabbitMQ Management UI di `http://localhost:15672`.
+- [ ] Berhasil membuat queue baru `lab0.<nama-anda>` dengan tipe `Classic Durable`.
+- [ ] Berhasil mempublish dan membaca ulang (*get*) pesan contoh melalui Management UI.
+- [ ] Memahami posisi dan mekanisme kerja `(AMQP default)` exchange.
+- [ ] Mengamati perubahan grafik throughput di tab Overview saat pesan mengalir.
+
+Jika seluruh poin checklist telah tercentang, environment broker Anda telah siap digunakan untuk modul Lab 1 (MP-04) dan Lab 3 (MP-06) yang mulai melibatkan kode aplikasi.
+
+---
+
+## Eskalasi Kendala Lingkungan
+
+Jika broker lokal di laptop Anda belum berhasil menyala, segera laporkan ke tim instruktur atau asisten di kanal kelas agar dapat dibantu penanganannya di breakout room. Pastikan lingkungan broker sudah siap 100% sebelum memasuki sesi hari kedua.

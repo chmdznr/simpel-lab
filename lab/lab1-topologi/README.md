@@ -1,169 +1,156 @@
 # Lab 1 — Bedah Topologi RabbitMQ
 
-**Hari 2, MP-04.2 dan MP-04.3. Dua bagian praktik, masing-masing 45 menit.**
-Gunakan Management UI. Kode producer/consumer mulai dikerjakan pada MP-06.
-Label UI di bawah diperiksa pada RabbitMQ **4.3.5**. Pada versi lain, cari
-bagian yang memiliki fungsi sama dan catat versinya pada hasil pengamatan.
+**Hari 2 · Modul MP-04 (Sesi MP-04.2 & MP-04.3) · 2 Bagian Praktik @ 45 Menit.**
 
-## Hasil yang dikumpulkan
+Seluruh latihan Lab 1 dilakukan melalui **RabbitMQ Management UI** untuk membedah mekanika perutean pesan sebelum kita menulis kode producer/consumer di MP-06.
 
-Satu diagram komponen RabbitMQ dalam vhost peserta dan tabel hasil delapan
-percobaan pada bagian D. Diagram harus menampilkan producer, exchange,
-binding, queue, consumer, nama resource, tipe exchange, serta routing key atau
-header. Gambar di kertas lalu foto, atau gunakan aplikasi diagram pilihan kelas.
+> Panduan ini diverifikasi menggunakan RabbitMQ **4.3.5**. Jika menggunakan versi minor lain, tata letak menu pada dasarnya sama; catat versinya pada lembar laporan.
 
-## Persiapan
+---
 
-1. Dari folder `simpel-lab`, jalankan `docker compose up -d rabbitmq`.
-2. Jalankan `docker compose ps rabbitmq`. Tunggu status **healthy**.
-3. Buka `http://localhost:15672` dan masuk menggunakan akun lokal pada `.env`.
-4. Gunakan kode peserta, misalnya `p01`. Ganti contoh `p01` di seluruh panduan
-   dengan kode sendiri. Nama resource `lab1.*` tetap sama karena vhost terpisah.
-5. Peserta yang memakai broker cadangan menggunakan alamat UI, vhost, dan akun
-   yang dibagikan instruktur. Instruktur mengerjakan langkah administrasi pada
-   bagian A. Peserta menerima akses hanya ke vhost masing-masing.
+## Deliverable yang Dikumpulkan
 
-Alokasi Lab 1A: akses 10 menit, direct 12 menit, fanout 12 menit, pencatatan
-dan bantuan 11 menit. Lab 1B: topic 12 menit, headers 12 menit, tipe queue
-8 menit, diagram dan pembahasan 13 menit. Minta bantuan di kanal kelas setelah
-dua menit tanpa kemajuan.
+1. **Diagram Arsitektur Komponen RabbitMQ** pada vhost masing-masing peserta: menampilkan producer, exchange (beserta tipenya), binding key/arguments, queue, dan consumer yang direncanakan. (Boleh digambar di kertas lalu difoto, atau menggunakan tools diagram seperti Excalidraw/draw.io).
+2. **Tabel Hasil Observasi 8 Percobaan** (sesuai matriks di Bagian D).
 
-## A. Vhost dan akun peserta — administrator lokal/instruktur
+---
 
-1. Buka **Admin → Virtual Hosts → Add a new virtual host**. Isi nama
-   `lab1-p01`, lalu **Add virtual host**. Vhost ini terpisah dari vhost Lab 0.
-2. Buka **Admin → Users → Add a user**. Isi username `p01` dan password
-   latihan yang dipilih sendiri. Jangan gunakan password akun kantor.
-3. Pada **Tags**, pilih/isi `management`, lalu **Add user**. Tag ini memberi
-   akses Management UI. Permission vhost tetap perlu diberikan secara terpisah.
-4. Klik user `p01`. Di bagian **Set permission**, pilih vhost `lab1-p01`.
-   Isi ketiga kolom **Configure**, **Write**, dan **Read** dengan pola yang sama:
+## Persiapan Awal
 
-   ```text
-   ^lab1\..*
-   ```
+1. Buka terminal di folder `simpel-lab/`, lalu nyalakan broker: `docker compose up -d rabbitmq`.
+2. Periksa status: `docker compose ps rabbitmq` (pastikan berstatus **healthy**).
+3. Buka browser ke `http://localhost:15672` dan login menggunakan akun admin lokal di `.env` (`simpel` / `simpel123`).
+4. Siapkan kode peserta Anda, misalnya `p01`. Ganti contoh `p01` pada panduan ini dengan kode Anda sendiri. (Nama resource diawali `lab1.*` karena setiap peserta bekerja pada vhost terisolasi).
 
-5. Klik **Set permission**. Akun ini dapat mengelola resource berawalan
-   `lab1.` pada vhost tersebut. Jangan memberi permission ke vhost peserta lain.
-6. Logout, lalu login sebagai `p01`. Pilih vhost `lab1-p01` jika ada pemilih
-   vhost di kanan atas. Pastikan akun ini tidak memiliki fasilitas administrator.
+**Alokasi Waktu:**
+- **Lab 1A (45 menit):** Setup akun & vhost (10 m) $\rightarrow$ Direct Exchange (12 m) $\rightarrow$ Fanout Exchange (12 m) $\rightarrow$ Review & pencatatan (11 m).
+- **Lab 1B (45 menit):** Topic Exchange (12 m) $\rightarrow$ Headers Exchange (12 m) $\rightarrow$ Eksplorasi Quorum Queue (8 m) $\rightarrow$ Diagram & pembahasan (13 m).
 
-Nama vhost tidak perlu diawali `/`. Slash merupakan karakter nama, bukan
-syarat vhost. Penggunaan nama tanpa slash memudahkan penulisan URL nanti.
+---
 
-## B. Direct dan fanout — Lab 1A
+## A. Pembuatan Vhost dan Akun Peserta (Setup Administrator)
 
-### Membuat exchange dan queue
+1. **Buat Vhost**:
+   - Buka menu **Admin → Virtual Hosts → Add a new virtual host**.
+   - Isi nama vhost: `lab1-p01`, lalu klik **Add virtual host**.
+   > *Catatan:* Nama vhost tidak perlu diawali tanda slash `/`. Di RabbitMQ, slash diperlakukan sebagai karakter nama biasa, bukan direktori hirarkis. Menghindari slash membuat format URL koneksi AMQP lebih bersih.
+2. **Buat User Baru**:
+   - Buka menu **Admin → Users → Add a user**.
+   - Isi **Username**: `p01` dan tentukan password latihan sendiri.
+   - Pada kolom **Tags**, pilih/isi `management`, lalu klik **Add user**. (Tag ini memberi hak akses login ke Management UI; hak akses vhost diatur terpisah pada langkah berikutnya).
+3. **Konfigurasi Hak Akses (Permission)**:
+   - Klik user `p01` yang baru dibuat.
+   - Pada bagian **Set permission**, pilih vhost `lab1-p01`.
+   - Isi ketiga kolom regex (**Configure**, **Write**, **Read**) dengan pola regex berjangkar (*anchored regex*):
+     ```text
+     ^lab1\..*
+     ```
+   - Klik **Set permission**. User ini sekarang berhak mengelola resource berawalan `lab1.` pada vhost miliknya, tanpa bisa melihat atau mengganggu vhost peserta lain.
+4. **Verifikasi Login**:
+   - Logout dari akun admin, lalu login sebagai `p01`.
+   - Di pojok kanan atas, pastikan vhost aktif terpilih adalah `lab1-p01`.
+   - Pastikan akun ini tidak memiliki tab Admin (karena bukan administrator).
 
-1. Buka **Exchanges → Add a new exchange**. Buat `lab1.direct`, Type `direct`,
-   Durability `Durable`, Auto delete `No`, Internal `No`, Arguments kosong.
-2. Dengan langkah yang sama, buat `lab1.fanout`, Type `fanout`.
-3. Buka **Queues and Streams → Add a new queue**. Buat tiga queue di bawah.
-   Pilih **Type: Classic**, Durability `Durable`, Auto delete `No`, Arguments
-   kosong untuk masing-masing queue. Pilih tipenya secara eksplisit.
+---
 
-   | Queue | Exchange asal | Binding key |
-   |---|---|---|
-   | `lab1.direct.validasi` | `lab1.direct` | `pengajuan.siup.jakarta` |
-   | `lab1.fanout.validasi` | `lab1.fanout` | kosong |
-   | `lab1.fanout.tracking` | `lab1.fanout` | kosong |
+## B. Direct dan Fanout Exchange — Lab 1A
 
-4. Buka detail exchange. Pada **Bindings → Add binding from this exchange**,
-   pilih destination type **Queue**, isi **To queue** sesuai tabel, isi
-   **Routing key**, lalu **Bind**. Ulangi sampai ketiga binding terpasang.
-5. Periksa daftar binding. Queue yang dibuat tanpa binding belum menerima
-   pesan dari exchange latihan tersebut.
+### 1. Membuat Exchange dan Queue
 
-### Cara menjalankan setiap percobaan
+1. **Buat Exchange**:
+   - Buka menu **Exchanges → Add a new exchange**.
+   - Buat `lab1.direct`: Type `direct`, Durability `Durable`, Auto delete `No`, Internal `No`, Arguments kosong.
+   - Dengan langkah yang sama, buat `lab1.fanout`: Type `fanout`, parameter lainnya identik.
+2. **Buat Queue**:
+   - Buka menu **Queues and Streams → Add a new queue**.
+   - Buat tiga queue dengan parameter **Type: Classic**, Durability `Durable`, Auto delete `No`, Arguments kosong:
+     - `lab1.direct.validasi`
+     - `lab1.fanout.validasi`
+     - `lab1.fanout.tracking`
+3. **Membuat Binding**:
+   - Buka detail exchange `lab1.direct` $\rightarrow$ bagian **Bindings → Add binding from this exchange**.
+   - Masukkan To queue: `lab1.direct.validasi`, Routing key: `pengajuan.siup.jakarta`, lalu klik **Bind**.
+   - Buka detail exchange `lab1.fanout` $\rightarrow$ bind ke `lab1.fanout.validasi` (Routing key dikosongkan).
+   - Masih di `lab1.fanout` $\rightarrow$ bind ke `lab1.fanout.tracking` (Routing key dikosongkan).
 
-1. Tulis dulu queue mana yang diperkirakan menerima pesan.
-2. Buka detail **exchange** asal, lalu **Publish message**. Isi routing key
-   sesuai tabel D. Pada **Properties**, isi nama `delivery_mode` dan nilai `2`
-   (persistent). RabbitMQ 4.3.5 memakai pasangan nama/nilai, bukan dropdown.
-3. Isi payload sederhana, misalnya `{"case":"D1","pengajuanId":"SIM-001"}`.
-   Ganti `case` untuk setiap percobaan. Tambahkan Headers hanya untuk H1/H2.
-4. Klik **Publish message**. Amati hasil routing dan jumlah **Ready** pada
-   queue yang diperkirakan menerima. Angka UI diperbarui berkala; refresh bila perlu.
-5. Buka queue tujuan → **Get messages**, Messages `1`, Ack Mode
-   **Automatic ack**, lalu **Get Message(s)**. Mode ini tidak mengembalikan
-   pesan ke antrean. Periksa `case` pada payload. Ulangi sampai queue kosong.
-   Ini hanya inspeksi lab; aplikasi bisnis memakai strategi acknowledgment sendiri.
-6. Queue yang tidak seharusnya menerima pesan harus tetap kosong. Selesaikan
-   inspeksi dan kosongkan pesan percobaan sebelum berpindah kasus agar hasil jelas.
+### 2. Prosedur Uji Coba Pengiriman Pesan
 
-## C. Topic, headers, dan tipe queue — Lab 1B
+1. Tuliskan prediksi queue mana yang akan menerima pesan sebelum menekan tombol publish.
+2. Buka detail exchange asal $\rightarrow$ bagian **Publish message**.
+3. Masukkan **Routing key** sesuai tabel di Bagian D.
+4. Pada bagian **Properties**, tambahkan properti dengan nama `delivery_mode` dan nilai `2` (*persistent*).
+5. Masukkan payload JSON sederhana, misalnya: `{"case":"D1","pengajuanId":"SIM-001"}`.
+6. Klik **Publish message**. Amati perubahan kolom **Ready** pada queue tujuan.
+7. Buka queue tujuan $\rightarrow$ bagian **Get messages**, isi Messages `1`, Ack Mode pilih **Automatic ack**, lalu klik **Get Message(s)** untuk memeriksa isi pesan dan mengosongkan antrean lab.
 
-1. Buat `lab1.topic` dengan Type `topic` dan `lab1.headers` dengan Type `headers`.
-   Gunakan atribut Durable/Auto delete/Internal yang sama dengan bagian B.
-2. Buat tiga queue **Classic Durable** dan binding berikut:
+---
 
-   | Queue | Exchange | Binding key / arguments |
-   |---|---|---|
-   | `lab1.topic.jakarta` | `lab1.topic` | key `pengajuan.*.jakarta` |
-   | `lab1.topic.siup` | `lab1.topic` | key `pengajuan.siup.#` |
-   | `lab1.headers.jakarta` | `lab1.headers` | key kosong; arguments di bawah |
+## C. Topic, Headers, dan Quorum Queue — Lab 1B
 
-3. Untuk binding headers, tambahkan tiga **Arguments** pada form binding:
-   `x-match` = `all`, `jenis` = `siup`, `kantor` = `jakarta`.
-   Ketiganya bertipe **String**. Pilih **Bind** setelah semua terisi.
-4. Saat publish H1/H2, isi bagian **Headers** pada Publish message:
-   baris `jenis` = `siup`, baris `kantor` = `jakarta`, keduanya **String**.
-   Baris berikutnya muncul saat Anda mengetik. Ini header pesan, berbeda
-   dari Arguments pada binding. Untuk H2, ubah `kantor` menjadi `bandung`.
-   Routing key boleh diisi `diabaikan`. Pertahankan Properties `delivery_mode` = `2`.
-5. Buat queue tambahan `lab1.quorum`, Type **Quorum**, Durable. Jangan membuat
-   binding untuk queue ini. Bandingkan label tipe/anggota queue dengan salah
-   satu queue classic. Queue quorum pada broker satu node memiliki satu anggota
-   dan tidak tahan kehilangan node tersebut. Latihan ini tidak menguji failover.
+1. Buat dua exchange baru:
+   - `lab1.topic` (Type: `topic`, Durable)
+   - `lab1.headers` (Type: `headers`, Durable)
+2. Buat tiga queue bertipe **Classic Durable**:
+   - `lab1.topic.jakarta`
+   - `lab1.topic.siup`
+   - `lab1.headers.jakarta`
+3. Konfigurasi binding:
+   - Bind `lab1.topic` $\rightarrow$ `lab1.topic.jakarta` dengan routing key: `pengajuan.*.jakarta`
+   - Bind `lab1.topic` $\rightarrow$ `lab1.topic.siup` dengan routing key: `pengajuan.siup.#`
+   - Bind `lab1.headers` $\rightarrow$ `lab1.headers.jakarta` dengan key kosong, lalu tambahkan tiga baris **Arguments** bertipe **String**:
+     - `x-match` = `all`
+     - `jenis` = `siup`
+     - `kantor` = `jakarta`
+4. Untuk kasus pengujian **H1** dan **H2**, saat melakukan publish di exchange `lab1.headers`, masukkan atribut di bagian **Headers** form:
+   - Kasus H1: `jenis` = `siup`, `kantor` = `jakarta` (keduanya bertipe String).
+   - Kasus H2: `jenis` = `siup`, `kantor` = `bandung` (keduanya bertipe String).
+   - Routing key dapat diisi kata bebas (misalnya `diabaikan`) karena headers exchange tidak mengevaluasi routing key.
+5. **Eksplorasi Quorum Queue**:
+   - Buat queue baru bernama `lab1.quorum`, pilih Type **Quorum**, Durable. (Jangan pasang binding untuk queue ini).
+   - Bandingkan label dan metadata quorum queue dengan classic queue. Pada broker standalone satu node, quorum queue hanya memiliki 1 replica/member Raft sehingga belum memiliki toleransi fault-tolerance cluster.
 
-## D. Matriks percobaan
+---
 
-Setiap baris mempublikasikan **satu** pesan. Kolom tujuan merupakan hasil yang
-seharusnya diperoleh; tuliskan prediksi sebelum melihatnya jika bekerja berpasangan.
+## D. Matriks Percobaan dan Observasi
 
-| Kasus | Exchange | Routing key / header | Queue tujuan |
-|---|---|---|---|
-| D1 | `lab1.direct` | `pengajuan.siup.jakarta` | `lab1.direct.validasi` |
-| D2 | `lab1.direct` | `pengajuan.siup.bandung` | tidak ada |
-| F1 | `lab1.fanout` | `bebas` | `lab1.fanout.validasi`, `lab1.fanout.tracking` |
-| T1 | `lab1.topic` | `pengajuan.siup.jakarta` | `lab1.topic.jakarta`, `lab1.topic.siup` |
-| T2 | `lab1.topic` | `pengajuan.nib.jakarta` | `lab1.topic.jakarta` |
-| T3 | `lab1.topic` | `pengajuan.siup.jakarta.revisi` | `lab1.topic.siup` |
-| H1 | `lab1.headers` | jenis=`siup`, kantor=`jakarta` | `lab1.headers.jakarta` |
-| H2 | `lab1.headers` | jenis=`siup`, kantor=`bandung` | tidak ada |
+Setiap baris menguji publikasi **satu pesan**. Tuliskan prediksi Anda terlebih dahulu sebelum mempublish:
 
-Jelaskan: mengapa T3 tidak mencapai queue Jakarta? Apa beda satu pesan yang
-disalin ke dua queue dengan dua worker yang membaca satu queue? Mengapa hasil
-D2 tidak boleh langsung dianggap sebagai keberhasilan penerimaan pekerjaan?
+| Kasus | Exchange | Routing Key / Header | Prediksi Queue Tujuan | Hasil Observasi Nyata |
+|---|---|---|---|---|
+| **D1** | `lab1.direct` | `pengajuan.siup.jakarta` | `lab1.direct.validasi` | |
+| **D2** | `lab1.direct` | `pengajuan.siup.bandung` | *(tidak ada / unroutable)* | |
+| **F1** | `lab1.fanout` | *(bebas / diabaikan)* | `lab1.fanout.validasi`, `lab1.fanout.tracking` | |
+| **T1** | `lab1.topic` | `pengajuan.siup.jakarta` | `lab1.topic.jakarta`, `lab1.topic.siup` | |
+| **T2** | `lab1.topic` | `pengajuan.nib.jakarta` | `lab1.topic.jakarta` | |
+| **T3** | `lab1.topic` | `pengajuan.siup.jakarta.revisi` | `lab1.topic.siup` | |
+| **H1** | `lab1.headers` | `jenis=siup`, `kantor=jakarta` | `lab1.headers.jakarta` | |
+| **H2** | `lab1.headers` | `jenis=siup`, `kantor=bandung` | *(tidak ada / unroutable)* | |
 
-## E. Penyelesaian dan daftar tilik
+### Pertanyaan Analisis Teknis
 
-- [ ] Login peserta bekerja dan hanya memiliki akses ke vhost sendiri.
-- [ ] Empat exchange, enam queue classic, dan satu queue quorum terlihat.
-- [ ] Delapan kasus cocok dengan matriks, termasuk dua kasus tanpa tujuan.
-- [ ] Diagram mencantumkan tipe exchange, binding, queue, dan consumer yang direncanakan.
-- [ ] Penjelasan membedakan routing, penyimpanan pesan, dan pemrosesan bisnis.
+1. **Mengapa kasus T3 tidak masuk ke `lab1.topic.jakarta`?**
+   *Penjelasan:* Pola `pengajuan.*.jakarta` menggunakan wildcard star (`*`) yang mencocokkan **tepat satu kata/segmen**. Routing key `pengajuan.siup.jakarta.revisi` memiliki 4 segmen dan berakhiran `.revisi`, sehingga tidak cocok dengan pola yang berakhiran `.jakarta`. Sebaliknya, pola `pengajuan.siup.#` menggunakan wildcard hash (`#`) yang mencocokkan nol atau banyak segmen kata berikutnya.
+2. **Apa perbedaan mendasar antara satu pesan yang digandakan ke dua queue (Pub-Sub) vs dua worker yang membaca satu queue yang sama (Competing Consumers)?**
+3. **Pada kasus D2, mengapa tidak adanya queue tujuan tidak menghasilkan pesan error ke publisher secara default?** (Konsep pesan unroutable dan parameter *mandatory*).
 
-Kumpulkan diagram dan tabel prediksi/hasil dengan kode peserta. Jangan sertakan
-password. Simpan vhost untuk sesi berikutnya. Penghapusan hanya dilakukan pada
-resource milik sendiri setelah instruktur menyatakan hasil sudah disimpan.
+---
 
-Jika hasil berbeda: periksa vhost aktif, salah ejaan, tipe exchange, binding,
-serta tipe String pada header. Error `ACCESS_REFUSED` mengarah ke akun/permission;
-`PRECONDITION_FAILED` sering berarti nama resource sudah ada dengan atribut lain.
-Jangan menghapus queue lain untuk memperbaikinya.
+## E. Checklist Verifikasi Mandiri
 
-## Pemeriksaan instruktur
+- [ ] User peserta berhasil login dan hanya memiliki hak akses pada vhost `lab1-p01`.
+- [ ] Empat exchange (`direct`, `fanout`, `topic`, `headers`) berhasil dideklarasikan.
+- [ ] Enam Classic Queue dan satu Quorum Queue terdaftar pada vhost.
+- [ ] Seluruh 8 skenario pengujian cocok dengan prediksi matriks perutean.
+- [ ] Diagram topologi mencantumkan relasi exchange, binding key/arguments, queue, dan peran consumer.
 
-`tools/verify-lab1.mjs` menjalankan kasus yang sama lewat HTTP API dan menguji
-penolakan akses di luar pola resource serta vhost peserta. Skrip membuat vhost
-dan user sementara dengan nama unik, lalu membersihkannya sendiri. Jalankan
-hanya terhadap broker lab dengan akun administrator:
+---
+
+## Skrip Verifikasi Otomatis Instruktur
+
+Tersedia skrip pengujian otomatis via HTTP API untuk memvalidasi konfigurasi lab peserta secara cepat:
 
 ```bash
 RABBITMQ_MANAGEMENT_URL=http://localhost:15672 node --env-file=.env tools/verify-lab1.mjs
 ```
 
-Sumber: [AMQP concepts](https://www.rabbitmq.com/tutorials/amqp-concepts),
-[access control](https://www.rabbitmq.com/docs/access-control), dan
-[quorum queues](https://www.rabbitmq.com/docs/quorum-queues).
+Rujukan teknis: [Dokumentasi AMQP Concepts RabbitMQ](https://www.rabbitmq.com/tutorials/amqp-concepts) dan [RabbitMQ Access Control](https://www.rabbitmq.com/docs/access-control).

@@ -1,82 +1,111 @@
-# Lab 4A — Fanout dan subscription yang independen
-**MP-07 Bagian 1, hari ketiga, Rabu 16 September 2026. Praktik 45 menit.**
+# Lab 4A — Fanout Exchange & Independent Subscriptions
 
-MP-07 total 4 JP dibagi dua hari. Hari ketiga berisi teori routing 45 menit dan
-Lab 4A 45 menit; hari keempat berisi Lab 4B 90 menit untuk routing lanjutan,
-retry tertunda, dan penanganan DLQ. Halaman ini menyajikan Lab 4A;
-lanjutan hari keempat tersedia di [Lab 4B](README-part2.md).
+**Modul MP-07 (Bagian 1) · Hari 3 (Rabu, 16 September 2026) · Praktik 45 Menit.**
 
-## Target dan batas
-Satu event pengajuan diterima harus menghasilkan catatan validasi dan catatan tracking
-yang independen. Menjalankan dua consumer pada satu queue membagi pekerjaan;
-dua subscription memerlukan dua queue. Event `pengajuan.diterima` pada tracking
-hanya menunjukkan penerimaan event, bukan bahwa validasi/billing sudah selesai.
+Modul MP-07 dialokasikan total 4 JP yang dibagi dalam dua hari:
+- **Hari 3 (Lab 4A - 45 Menit):** Teori pola routing dan praktik Fanout Exchange untuk broadcast event ke banyak subscriber independen.
+- **Hari 4 (Lab 4B - 90 Menit):** Praktik Topic Routing lanjutan, delayed retry berbasis DLX & TTL, serta penanganan Dead-Letter Queue (DLQ). Lihat panduan di [`README-part2.md`](README-part2.md).
 
-Mode fanout merupakan percobaan eksplisit. Rancangan event topic pada Lab 2 tetap
-menjadi rujukan integrasi akhir; kita tidak mengganti seluruh desain dengan fanout.
-Lab ini menggunakan `simpel.fanout`, `validasi.fanout.q`, dan `tracking.q`.
-Queue `validasi.q` Lab 3 tetap terpisah. Queue dan binding dibuat sebelum publish.
+---
 
-## Langkah 45 menit
-1. **0–5 menit — prediksi.** Gambar satu fanout exchange dengan dua queue.
-   Tulis penerima event F1. Prediksi apa yang berubah ketika tracking berhenti.
-2. **5–10 — pindah mode.** Selesaikan backlog Lab 3. Hentikan gateway dan semua
-   worker Lab 3 dengan Ctrl-C. Pastikan port gateway bebas. Jalankan
-   `npm run db:siapkan` untuk menambahkan tabel tracking pada volume lama.
-3. **10–15 — jalankan.** Gunakan tiga terminal dari akar repo:
-   ```bash
-   SIMPEL_MODE=fanout npm run broker:gateway
-   SIMPEL_MODE=fanout WORKER_ID=vfan npm run broker:validasi
-   SIMPEL_MODE=fanout WORKER_ID=track npm run broker:tracking
-   ```
-   Setiap baris berada pada terminal berbeda. Periksa log ready dan nama queue.
-4. **15–20 — satu event, dua subscription.**
-   `npm run kirim -- --count=10 --run=fan01`, lalu
-   `npm run hasil -- fan01`. Setelah drain, validationRows=10 dan trackingRows=10.
-   Cocokkan business ID; kedua consumer menerima message ID yang sama.
-   Ini 10 event yang disalin ke dua queue, bukan 20 pengajuan baru.
-5. **20–25 — tracking berhenti.** Hentikan hanya terminal tracking. Kirim
-   `npm run kirim -- --count=5 --run=trackoff`. Validasi tetap memproses.
-   Management menunjukkan Ready bertambah 5 pada tracking.q. Hasil untuk run
-   ini: validationRows=5, trackingRows=0 selama tracking belum berjalan.
-6. **25–30 — pemulihan.** Jalankan tracking dengan mode fanout lagi.
-   TrackingRows menjadi 5. Diskusikan mengapa publish sebelum queue/binding
-   tracking dibuat tidak akan direplay secara otomatis.
-7. **30–35 — baca topologi dan matriks routing.** Buka `layanan/messaging.js`.
-   Fanout mengabaikan routing key. Ingat eksperimen topic Lab 1: binding
-   `pengajuan.*.jakarta` dan `pengajuan.siup.#` memberikan hasil berbeda.
-   Prediksi tiga key: pengajuan.siup.jakarta, pengajuan.nib.jakarta,
-   pengajuan.siup.jakarta.revisi. Jawaban: keduanya; Jakarta; SIUP.
-   Kunci ini latihan routing bertingkat, bukan pengganti event `pengajuan.diterima`.
-8. **35–40 — failure table.** Lengkapi tabel di bawah. Bandingkan no route,
-   consumer mati, kontrak invalid, dan dependency failure. Jangan memberi
-   semua kegagalan jawaban `nack(requeue=true)`.
-9. **40–45 — presentasi singkat.** Tunjukkan bukti dua hasil, backlog tracking,
-   dan recovery. Sebutkan apa yang masih menjadi pekerjaan Lab 4B.
+## Target Pembelajaran dan Batasan Desain
 
-| Kondisi | Bukti yang harus dicari | Tindakan |
+Satu event pengajuan yang diterima sistem harus menghasilkan dua catatan independen: satu di service **Validasi** dan satu di service **Tracking**.
+- Menempatkan dua worker pada **satu queue yang sama** akan membagi beban kerja (*competing consumers*).
+- Menyediakan salinan event yang sama ke **dua service berbeda** mewajibkan pembuatan **dua queue terpisah** (*publish-subscribe*).
+- Event `pengajuan.diterima` yang masuk ke antrean tracking hanya membuktikan penerimaan event di awal alur, bukan bukti bahwa proses validasi atau billing telah selesai.
+
+Eksperimen Lab 4A menggunakan Fanout Exchange `simpel.fanout` yang diikat (*bind*) ke dua antrean: `validasi.fanout.q` dan `tracking.q`. Queue ini berdiri sendiri dan tidak mengganggu antrean `validasi.q` dari Lab 3.
+
+---
+
+## Tahapan Praktik (45 Menit)
+
+### 1. Menit 0–5: Prediksi Alur Fanout
+Buat sketsa diagram satu Fanout Exchange yang terhubung ke dua queue terpisah. Buat prediksi tertulis: apa yang terjadi jika salah satu subscriber (misalnya service Tracking) mati saat event dipublish?
+
+### 2. Menit 5–10: Persiapan Environment
+Hentikan Gateway dan seluruh worker dari Lab 3 (`Ctrl+C`). Pastikan port 3001 sudah bebas. Jalankan pembaruan tabel database:
+```bash
+npm run db:siapkan
+```
+
+### 3. Menit 10–15: Menjalankan Stack Fanout
+Buka tiga tab terminal terpisah di root folder `simpel-lab/`:
+
+```bash
+# Terminal A (Gateway mode fanout):
+SIMPEL_MODE=fanout npm run broker:gateway
+
+# Terminal B (Worker Validasi):
+SIMPEL_MODE=fanout WORKER_ID=vfan npm run broker:validasi
+
+# Terminal C (Worker Tracking):
+SIMPEL_MODE=fanout WORKER_ID=track npm run broker:tracking
+```
+
+Perhatikan pesan log terminal: pastikan masing-masing worker berhasil mendeklarasikan antreannya dan menampilkan status ready.
+
+### 4. Menit 15–20: Satu Event, Dua Subscriber Independen
+Di terminal lain, kirim 10 event pengajuan:
+```bash
+npm run kirim -- --count=10 --run=fan01
+npm run hasil -- fan01
+```
+
+Setelah antrean terkuras (*drained*), amati hasilnya: `validationRows: 10` dan `trackingRows: 10`.
+Cocokkan ID pengajuan di kedua tabel; kedua consumer menerima `messageId` yang sama persis. Ini membuktikan bahwa 10 event yang dipublish oleh Gateway berhasil disalin oleh broker ke kedua queue pelanggan secara simultan.
+
+### 5. Menit 20–25: Eksperimen Subscriber Down (Tracking Offline)
+Hentikan hanya service tracking di Terminal C (`Ctrl+C`). Biarkan Gateway dan Validasi tetap berjalan. Kirim 5 event pengajuan baru:
+```bash
+npm run kirim -- --count=5 --run=trackoff
+```
+
+Amati perbedaannya:
+- Service Validasi tetap memproses pesan secara normal (`validationRows` bertambah 5).
+- Di RabbitMQ Management UI, antrean `tracking.q` menumpuk 5 pesan (kolom **Ready: 5**).
+- Hasil query `npm run hasil -- trackoff` membuktikan bahwa `validationRows: 5` dan `trackingRows: 0`. Keterlambatan atau matinya service Tracking sama sekali tidak menghambat jalannya proses Validasi!
+
+### 6. Menit 25–30: Pemulihan Subscriber (Recovery)
+Nyalakan kembali service Tracking di Terminal C:
+```bash
+SIMPEL_MODE=fanout WORKER_ID=track npm run broker:tracking
+```
+
+Amati bahwa antrean `tracking.q` langsung menguras 5 pesan yang tertahan, dan `trackingRows` kini bertambah menjadi 5. 
+
+> **Poin Diskusi Kritis:** Mengapa event yang dipublish SEBELUM queue/binding dibuat tidak akan pernah diterima oleh subscriber baru? (Ingat bahwa RabbitMQ queue bersifat ephemeral/durable point-in-time subscription, bukan replayable event store seperti Kafka!).
+
+### 7. Menit 30–35: Matriks Perutean Topic (Persiapan Lab 4B)
+Buka file [`layanan/messaging.js`](../../layanan/messaging.js).
+Ingat kembali perbedaan mendasar:
+- **Fanout Exchange:** Mem-broadcast pesan ke seluruh antrean yang terikat tanpa mengevaluasi routing key sama sekali.
+- **Topic Exchange:** Mengevaluasi routing key berdasarkan pola wildcard:
+  - Tanda bintang (`*`) mencocokkan **tepat satu kata/segmen**.
+  - Tanda pagar (`#`) mencocokkan **nol atau lebih kata/segmen**.
+
+Uji pemahaman: jika ada binding `pengajuan.*.jakarta` dan `pengajuan.siup.#`, routing key `pengajuan.siup.jakarta.revisi` akan masuk ke queue mana? (Jawaban: hanya masuk ke queue dengan binding `pengajuan.siup.#`).
+
+---
+
+## Tabel Penanganan Kasus Kegagalan
+
+| Skenario Insiden | Indikator yang Terlihat di Sistem | Tindakan Korektif |
 |---|---|---|
-| Consumer tracking mati | tracking.q Ready naik, validasi tetap selesai | pulihkan worker |
-| Tidak ada binding cocok | mandatory return pada publisher | perbaiki rute, rekonsiliasi |
-| Kontrak tidak valid | pengajuan.invalid bertambah | inspeksi/perbaiki kontrak |
-| DB gagal | worker berhenti, delivery kembali | pulihkan DB, restart terarah |
-| Dependency gagal berulang | perlu attempt count dan jeda | desain Lab 4B, bukan loop cepat |
+| **Consumer Tracking mati** | Kolom Ready pada `tracking.q` meningkat, Validasi berjalan normal | Nyalakan kembali worker tracking; antrean otomatis diproses |
+| **Tidak ada binding yang cocok (*unroutable*)** | Muncul event `basic.return` pada publisher (jika `mandatory: true`) | Perbaiki konfigurasi binding, lakukan rekonsiliasi data |
+| **Kontrak JSON cacat/rusak** | Jumlah pesan pada antrean `pengajuan.invalid` bertambah | Karantina pesan, periksa schema contract, beri tahu tim hulu |
+| **Koneksi Database Worker putus** | Worker berhenti konsumsi, pesan yang belum di-ack di-requeue | Pulihkan database, jalankan kembali worker |
+| **Dependensi eksternal mati berulang** | Antrean menumpuk, worker terancam looping error tanpa henti | Terapkan pola Delayed Retry & DLQ berjadwal (dibahas di Lab 4B) |
 
-## Berkas yang dikumpulkan
-Gambar topologi, receipts fan01 dan trackoff, hasil jumlah/ID untuk kedua tabel,
-serta tiga kalimat: mengapa dua queue diperlukan; mengapa tracking dapat tertinggal;
-mengapa fanout bukan riwayat event yang bisa direplay setelah subscription dibuat.
+---
 
-**Rubrik (10):** dua queue dan binding benar (3); bukti kedua subscription (3);
-kemandirian dan recovery tracking (2); diagnosis failure dan batas replay (2).
-Lab 4A selesai jika peserta dapat menjelaskan hasil, bukan sekadar melihat queue kosong.
+## Checklist Kelulusan Lab 4A
 
-## Jembatan ke hari keempat
-Pelajari perbedaan alternate exchange dan DLX: alternate exchange menangani pesan
-yang tidak terute dari sebuah exchange; DLX menerima dead-letter dari queue pada
-kondisi tertentu. TTL mengatur kedaluwarsa, bukan jadwal tepat. Rancangan retry
-memerlukan jeda, batas percobaan, tujuan terminal, dan replay setelah perbaikan.
-Lab 4A belum mengimplementasikan retry tertunda atau DLQ operasional lengkap.
+- [ ] Berhasil mendemonstrasikan replikasi pesan ke dua antrean independen via Fanout Exchange.
+- [ ] Membuktikan decoupling: service Validasi tetap berjalan normal saat service Tracking mati.
+- [ ] Membuktikan recovery: pesan pada `tracking.q` tidak hilang dan diproses tuntas saat worker dinyalakan kembali.
+- [ ] Memahami batasan replikasi broker: publish yang dilakukan sebelum binding terpasang tidak dapat direplay secara otomatis.
 
-Rujukan: [Exchanges](https://www.rabbitmq.com/docs/exchanges),
-[DLX](https://www.rabbitmq.com/docs/dlx), [TTL](https://www.rabbitmq.com/docs/ttl).
+Lanjutkan ke **[Lab 4B (Topic Routing, Delayed Retry, & DLQ)](README-part2.md)** untuk mengonfigurasi mekanisme penanganan kegagalan tingkat lanjut.

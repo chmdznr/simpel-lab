@@ -1,208 +1,141 @@
-# Panduan Setup — SIMPEL Lab
+# Panduan Persiapan Lingkungan (Setup Guide) — SIMPEL Lab
 
-**Dikirim H-1.** Mohon ikuti sampai selesai dan laporkan hasilnya (berhasil / macet
-di langkah mana) sebelum hari pelatihan. Tanpa ini, praktik 27 JP di kelas tidak
-bisa Anda ikuti.
+**Dikirimkan H-1 Sebelum Pelatihan Dimulai.**  
+Mohon ikuti panduan ini sampai selesai dan laporkan hasil verifikasinya sebelum hari pertama pelatihan. Kesiapan lingkungan ini adalah prasyarat mutlak untuk dapat mengikuti seluruh rangkaian 27 JP praktik hands-on.
 
-Total waktu: sekitar 15–20 menit kalau koneksi internet lancar (unduhan image
-Docker \~600 MB).
+Estimasi waktu pengerjaan: sekitar 15–20 menit (tergantung kecepatan koneksi internet untuk mengunduh image Docker ~600 MB).
 
 ---
 
-## Yang Anda butuhkan
+## Prasyarat Perangkat & Software
 
-- Laptop dengan **Docker Desktop** terpasang dan **sedang berjalan**.
-- **Node.js versi 20** ke atas (`node --version`).
-- Minimal **4 GB RAM luang** (di luar yang dipakai OS & aplikasi lain).
-- Koneksi internet untuk mengunduh image Docker (sekali di awal saja).
-
-Belum punya Docker Desktop atau Node.js? Unduh dari situs resmi masing-masing
-sebelum lanjut — di luar cakupan panduan ini.
+- Laptop dengan **Docker Desktop** (atau Docker Engine di Linux) yang sudah terpasang dan **sedang berjalan**.
+- **Node.js versi 20** ke atas (verifikasi via `node --version`).
+- Minimal **4 GB RAM kosong** (di luar penggunaan sistem operasi dan aplikasi harian).
+- Koneksi internet stabil untuk mengunduh base image container di awal setup.
 
 ---
 
-## Langkah 1 — Unduh bahan lab
+## Langkah 1 — Unduh Repositori Lab
 
-Ikuti instruksi yang diberikan panitia untuk mendapatkan folder `simpel-lab/`
-(via link zip atau `git clone`). Buka terminal di dalam folder tersebut.
+Unduh atau clone folder repositori `simpel-lab/` sesuai instruksi dari panitia pelatihan. Buka aplikasi Terminal / Command Prompt, lalu arahkan ke root direktori tersebut:
 
-## Langkah 2 — Siapkan file konfigurasi
+```bash
+cd simpel-lab
+```
+
+---
+
+## Langkah 2 — Siapkan File Konfigurasi Environment
+
+Salin template konfigurasi ke file `.env` lokal:
 
 ```bash
 cp .env.contoh .env
 ```
 
-Nilai bawaan di `.env` sudah cocok untuk laptop sendiri. **Jangan ubah apa pun**
-di langkah ini kecuali Anda tahu port yang disebut di dalamnya sudah dipakai
-aplikasi lain (lihat Troubleshooting).
+> **Catatan:** Nilai bawaan di dalam `.env` sudah dikonfigurasi optimal untuk penggunaan lokal di laptop. Jangan mengubah isi file ini kecuali terdapat port yang bentrok dengan aplikasi lokal lain (lihat bagian *Troubleshooting* di bawah).
 
-## Langkah 3 — Nyalakan broker & database
+---
+
+## Langkah 3 — Jalankan Container Broker & Database
+
+Jalankan container RabbitMQ dan PostgreSQL di latar belakang (*detached mode*):
 
 ```bash
 docker compose up -d rabbitmq postgres
 ```
 
-Perintah ini mengunduh image `rabbitmq:4-management` dan `postgres:16-alpine`
-(sekali saja, tersimpan untuk pemakaian berikutnya), lalu menyalakan
-keduanya di latar belakang.
+Perintah ini akan mengunduh image `rabbitmq:4-management` dan `postgres:16-alpine` (hanya diunduh sekali di awal), lalu menyalakan kedua container tersebut.
 
-Prometheus dan Grafana **belum perlu dinyalakan sekarang** — baru dipakai di
-Hari 5 (MP-9). Kalau ingin menyalakan semuanya sekaligus: `docker compose up -d`.
+> Container Prometheus dan Grafana belum perlu dijalankan sekarang — stack monitoring baru digunakan pada Hari ke-5 (MP-09).
 
-## Langkah 4 — Verifikasi berhasil
+---
+
+## Langkah 4 — Verifikasi Kesehatan Container
+
+Periksa status container yang sedang berjalan:
 
 ```bash
 docker compose ps
 ```
 
-Anda harus melihat `simpel-rabbitmq` dan `simpel-postgres` dengan status
-`Up ... (healthy)`. Kalau masih `starting`, tunggu 30 detik lalu ulangi.
+Pastikan container `simpel-rabbitmq` dan `simpel-postgres` menampilkan status **`Up ... (healthy)`**. Jika status masih `starting`, tunggu sekitar 15–30 detik lalu ulangi perintah pengecekan.
 
-Lalu buka browser ke **http://localhost:15672** — Anda harus melihat halaman
-login RabbitMQ Management. Login dengan:
+### Akses RabbitMQ Management UI
+Buka web browser dan akses: **`http://localhost:15672`**. Login menggunakan kredensial default:
+- **Username:** `simpel`
+- **Password:** `simpel123`
 
-- Username: `simpel`
-- Password: `simpel123`
+Jika halaman dashboard Management UI berhasil terbuka dan menampilkan ringkasan overview broker, **setup infrastruktur dasar Anda dinyatakan berhasil.** Laporkan hasil ini kepada panitia / instruktur di grup kelas.
 
-Kalau halaman ini muncul dan Anda bisa login, **setup Anda berhasil.**
-Laporkan ke panitia/instruktur sesuai instruksi yang diberikan (biasanya lewat
-form atau grup kelas).
+---
 
-## Langkah 5 — Siapkan dependensi Node.js
+## Langkah 5 — Instalasi Dependensi Node.js
+
+Jalankan instalasi paket dependensi:
 
 ```bash
 npm install
 ```
 
-Ini memasang paket untuk semua layanan sekaligus (`express`, `amqplib`, `pg`).
-Tidak perlu diulang tiap hari — cukup sekali sekarang, dan lagi kalau
-instruktur memberi tahu ada layanan baru ditambahkan.
-
-## Langkah 6 (opsional, tapi dianjurkan) — Coba jalankan sesuatu
-
-Untuk memastikan Node.js dan Postgres benar-benar nyambung, bukan cuma
-container-nya hidup:
-
-```bash
-npm run sinkron:billing
-```
-
-Di terminal lain:
-
-```bash
-curl -X POST http://localhost:3003/billing \
-  -H 'content-type: application/json' \
-  -d '{"id":"test-1234"}'
-```
-
-Kalau muncul balasan JSON berisi `"ok":true` dan `"kodeBilling":"BIL-..."`,
-Node.js Anda siap. Tekan `Ctrl+C` untuk menghentikannya.
+Perintah ini akan memasang seluruh pustaka yang dibutuhkan (`amqplib`, `pg`, `express`, dll). Langkah ini hanya perlu dijalankan sekali di awal.
 
 ---
 
-## Kapan mematikan container
+## Langkah 6 (Opsional tapi Dianjurkan) — Uji Coba Layanan
 
-Boleh dibiarkan hidup selama masa pelatihan (2 minggu), atau dimatikan tiap
-selesai sesi dan dinyalakan lagi keesokan harinya:
+Untuk memastikan koneksi Node.js ke database PostgreSQL berjalan normal:
+
+1. Di terminal utama, jalankan salah satu service simulasi:
+   ```bash
+   npm run sinkron:billing
+   ```
+2. Di terminal kedua, kirim request uji via `curl`:
+   ```bash
+   curl -X POST http://localhost:3003/billing \
+     -H 'content-type: application/json' \
+     -d '{"id":"test-1234"}'
+   ```
+3. Jika terminal membalas dengan payload JSON `{"ok":true, "kodeBilling":"BIL-..."}`, environment Node.js dan database Anda sudah 100% siap. Hentikan service dengan menekan `Ctrl+C`.
+
+---
+
+## Manajemen Siklus Hidup Container
+
+Container boleh dibiarkan menyala selama periode pelatihan, atau dimatikan setiap kali sesi harian berakhir dan dinyalakan kembali keesokan harinya:
 
 ```bash
-docker compose stop     # matikan, data tetap tersimpan
-docker compose up -d    # nyalakan lagi
+docker compose stop     # Menghentikan container sementara, seluruh data tetap aman tersimpan
+docker compose up -d    # Menyalakan kembali container
 ```
 
-Hindari `docker compose down -v` kecuali benar-benar ingin menghapus semua
-data (volume) dan mulai dari nol.
+> **Peringatan:** Hindari menjalankan perintah `docker compose down -v` kecuali Anda memang berniat menghapus seluruh database/volume dan mereset environment dari nol.
 
 ---
 
-## Troubleshooting
+## Panduan Troubleshooting Masalah Umum
 
-### "Port sudah dipakai" (`port is already allocated`)
+### 1. Error Port Sudah Digunakan (`port is already allocated`)
+Jika port 5672, 15672, atau 5432 sudah terpakai oleh aplikasi lain di laptop Anda:
+1. Buka file `.env` dengan text editor.
+2. Ubah port yang bentrok ke port alternatif, misalnya:
+   ```text
+   RABBITMQ_PORT=5673
+   ```
+3. Sesuaikan juga URL koneksi pada baris `AMQP_URL` di bawahnya agar port-nya cocok.
+4. Jalankan `docker compose down` lalu jalankan kembali `docker compose up -d rabbitmq postgres`.
 
-Aplikasi lain di laptop Anda sudah memakai port yang sama (5672, 15672, 5432,
-9090, atau 3000). Edit `.env`, ganti nilai port yang bentrok, mis.:
+### 2. Error `Cannot connect to the Docker daemon`
+Aplikasi Docker Desktop belum menyala sempurna. Buka aplikasi Docker Desktop, tunggu hingga indikator di menu bar/taskbar menunjukkan status *running*, lalu ulangi perintah docker compose.
 
-```
-RABBITMQ_PORT=5673
-```
-
-Lalu `docker compose down` dan `docker compose up -d` lagi. Kalau port AMQP
-(`RABBITMQ_PORT`) Anda ubah, ingat sesuaikan juga `AMQP_URL` di baris
-bawahnya di `.env` (ganti angka port di URL-nya).
-
-### Docker Desktop tidak mau jalan / macet di "Starting..."
-
-- Restart Docker Desktop dari system tray/menu bar.
-- Kalau masih macet, restart laptop.
-- Pastikan virtualisasi aktif di BIOS (jarang jadi masalah di laptop modern,
-  tapi kadang muncul di laptop kantor yang dikunci kebijakan IT).
-
-### "Cannot connect to the Docker daemon"
-
-Docker Desktop belum menyala. Buka aplikasinya, tunggu sampai ikon di
-tray/menu bar menunjukkan status *running* (bukan *starting*), baru ulangi
-perintah `docker compose up -d`.
-
-### Memori tidak cukup / laptop jadi sangat lambat
-
-- Pastikan hanya `rabbitmq` dan `postgres` yang hidup selama Hari 1–4:
-  `docker compose up -d rabbitmq postgres` (jangan `up -d` polos yang
-  menyalakan semuanya termasuk Prometheus+Grafana).
-- Di Docker Desktop → Settings → Resources, turunkan batas RAM yang
-  dialokasikan ke Docker kalau laptop Anda di bawah 8 GB total, tapi jangan
-  di bawah 4 GB atau container bisa gagal start.
-- Tutup aplikasi lain yang berat (browser dengan puluhan tab, IDE besar) saat
-  sesi praktik berlangsung.
-
-### Kebijakan IT kantor memblokir Docker Desktop
-
-Ini kondisi yang **tidak bisa diselesaikan lewat panduan ini** — butuh dua
-opsi:
-
-1. **Kerja berpasangan.** Ikuti praktik menumpang di laptop rekan yang
-   Docker-nya jalan normal. Instruktur/panitia akan mengatur pasangan di
-   hari-H.
-2. **Broker cadangan terpusat** (lihat bagian di bawah) — mengatasi RabbitMQ
-   yang diblokir, TAPI kode Node.js dan `npm install` Anda tetap perlu jalan
-   lokal. Kalau Docker Desktop sendiri yang diblokir total, opsi ini tidak
-   menolong — pakai opsi 1.
-
-Laporkan kondisi ini ke panitia **sebelum hari-H**, jangan menunggu sampai
-sesi praktik dimulai.
+### 3. Kendala Kapasitas Memori / Laptop Lambat
+- Pastikan hanya menyalakan container yang dibutuhkan: `docker compose up -d rabbitmq postgres` (jangan menyalakan seluruh service monitoring sekaligus).
+- Pada pengaturan Docker Desktop (Settings $\rightarrow$ Resources), batasi alokasi RAM ke Docker minimal 4 GB.
+- Tutup aplikasi berat yang tidak digunakan selama sesi praktik berlangsung.
 
 ---
 
-## Broker cadangan terpusat
+## Langkah Selanjutnya
 
-Kalau RabbitMQ lokal Anda (lewat Docker) tidak bisa dijalankan tapi Node.js
-Anda tetap bisa jalan, panitia menyediakan satu instans RabbitMQ terpusat
-yang bisa diakses dari luar. **Anda tidak perlu mengubah kode apa pun** —
-cukup ganti connection string di `.env`:
-
-```bash
-# Komentari baris AMQP_URL yang menunjuk ke localhost:
-# AMQP_URL=amqp://simpel:simpel123@localhost:5672
-
-# Aktifkan baris ini, isi dengan kredensial yang dibagikan panitia di hari-H:
-AMQP_URL=amqp://<user-anda>:<password-anda>@broker.pelatihan.example:5672/<vhost-anda>
-```
-
-Setiap peserta mendapat **vhost sendiri** di broker cadangan supaya queue
-antar-peserta tidak saling bertabrakan. Jangan bagikan kredensial Anda ke
-peserta lain.
-
-Untuk Management UI broker cadangan, panitia akan membagikan alamat terpisah
-(bukan `localhost:15672`) — dipakai persis seperti di Lab 0, hanya alamat dan
-login-nya berbeda.
-
-**Catatan:** `postgres` tidak tersedia versi cadangannya. Layanan `validasi`
-yang menulis ke database tetap butuh Postgres lokal Anda jalan (lewat Docker)
-— broker cadangan hanya menggantikan RabbitMQ.
-
----
-
-## Sudah selesai? Langkah selanjutnya
-
-Simpan folder `simpel-lab/` ini, Anda akan memakainya lagi setiap hari selama
-pelatihan (14–25 September). Tidak perlu mengulang Langkah 1–5 tiap hari —
-cukup `docker compose up -d rabbitmq postgres` setiap kali mau mulai sesi.
+Simpan folder `simpel-lab/` ini di direktori kerja Anda. Anda akan menggunakannya setiap hari sepanjang sesi pelatihan (14–25 September 2026). Setiap kali memulai sesi kelas, cukup pastikan container aktif dengan perintah: `docker compose up -d rabbitmq postgres`.

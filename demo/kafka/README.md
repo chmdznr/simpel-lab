@@ -1,52 +1,57 @@
-# Demo instruktur — Kafka: pesan tetap, posisi baca berbeda
+# Demo Instruktur — Apache Kafka: Event Log Persisten & Replay Offset
 
-**MP-04.4 · 5 menit di kelas.** Persiapkan image dan broker sebelum kelas.
-Peserta cukup mengamati; tidak ada instalasi Kafka atau kode aplikasi peserta.
-Image dipatok pada Apache Kafka **4.0.2**, lini 4.0 dengan mode KRaft.
-Satu broker/controller ini hanya demonstrasi, bukan konfigurasi HA.
+**Sesi:** MP-04.4 · **Durasi:** 5 menit di kelas.
 
-Jalankan dari root `simpel-lab`. Semua CLI berjalan di container yang sama;
-tidak ada port Kafka yang dibuka ke host.
+Demonstrasi ini dilakukan oleh instruktur di depan kelas untuk memperlihatkan kontras arsitektur antara model antrean RabbitMQ (*destructive consumer read*) versus model distributed commit log Apache Kafka (*offset-based replayable log*). 
+
+Peserta cukup mengamati; tidak ada keharusan instalasi Kafka di laptop peserta.
+
+Menggunakan image Apache Kafka **4.0.2** (mode KRaft tanpa ZooKeeper). Instance standalone ini dikonfigurasi khusus untuk kebutuhan demonstrasi instruksional.
+
+---
+
+## Cara Menjalankan
+
+Jalankan dari root folder `simpel-lab/`. Seluruh perintah CLI dieksekusi di dalam container:
 
 ```bash
+# 1. Nyalakan container demo Kafka
 docker compose -f demo/kafka/docker-compose.yml -p simpel-kafka-demo up -d
+
+# 2. Tunggu sampai broker siap merespons daftar topic
 docker compose -f demo/kafka/docker-compose.yml -p simpel-kafka-demo exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list
-```
 
-Tunggu sampai perintah kedua berhasil. Lalu jalankan pemeriksaan demo:
-
-```bash
+# 3. Jalankan script demonstrasi otomatis
 bash demo/kafka/verify-demo.sh
 ```
 
-Script membuat topic baru, menerbitkan tiga event sintetis, lalu menampilkan
-ketiganya dua kali melalui **dua consumer group baru**. Nama topic dan group
-unik per eksekusi sehingga pengulangan demo tidak tercampur percobaan lama.
+Script akan membuat topic baru secara dinamis, mempublish 3 event sintetis, lalu membaca event tersebut sebanyak dua kali menggunakan **dua consumer group independen yang berbeda**. Nama topic dan consumer group digenerate unik pada setiap eksekusi agar pengujian berulang tidak saling tumpang tindih.
 
-## Alur bicara pengajar
+---
 
-1. **Prediksi (1 menit):** “Setelah konsumen pertama membaca, apakah event habis?”
-2. **Tunjukkan perintah (1 menit):** topic satu partition, replication factor satu;
-   urutan di contoh ini hanya dalam partition tersebut.
-3. **Amati output (2 menit):** group A dan group B masing-masing membaca tiga event.
-   `--from-beginning` dipakai dengan group baru. Pada group lama dengan committed
-   offset, flag itu bukan perintah universal untuk mereset posisi baca.
-4. **Tarik keputusan (1 menit):** konsumsi tidak menghapus record Kafka.
-   Retention/compaction menentukan data yang masih tersedia; offset menentukan
-   posisi konsumen. RabbitMQ Streams juga mendukung replay. Pembanding lab kita
-   adalah classic/quorum queue dengan acknowledgment, bukan semua fitur RabbitMQ.
+## Panduan Fasilitasi Demo Instruktur
 
-Demo ini tidak mengukur throughput, failover, atau jaminan exactly-once.
-Jika Docker gagal sebelum kelas, gunakan tiga baris event di script untuk
-walkthrough dan sebutkan bahwa demo tidak dijalankan; jangan mengklaim hasil live.
+1. **Prediksi (Menit ke-1):**
+   *Tanyakan ke kelas:* "Begitu Consumer Group A selesai membaca 3 event di topic ini, apakah pesan di Kafka akan hilang seperti halnya di RabbitMQ queue?"
+2. **Tunjukkan Konfigurasi (Menit ke-2):**
+   Tunjukkan bahwa topic memiliki 1 partition dan replication factor 1. Tegaskan bahwa jaminan urutan pesan di Kafka berlaku strictly per-partition.
+3. **Amati Output Replay (Menit ke-3 & 4):**
+   Tunjukkan terminal: Consumer Group A membaca 3 event dari awal. Beberapa detik kemudian, Consumer Group B yang baru bergabung juga membaca 3 event yang sama persis dari awal (`--from-beginning`). Pesan TIDAK terhapus saat dibaca!
+4. **Poin Kunci Pembelajaran (Menit ke-5):**
+   - Di Kafka, pembacaan oleh consumer tidak menghapus data. Record dipertahankan berdasarkan kebijakan retensi (*time/size retention*).
+   - Setiap consumer group mengelola cursor/posisinya sendiri via *committed offset*.
+   - Catatan arsitektur: RabbitMQ Streams juga menyediakan kapabilitas append-only log dan offset replay serupa. Model perbandingan di lab utama kita adalah RabbitMQ AMQP Queue (Classic & Quorum) yang berbasis konsumsi destruktif dengan acknowledgement.
 
-## Bersihkan demo sendiri
+---
+
+## Membersihkan Environment Demo
+
+Setelah demonstrasi selesai, bersihkan container dan volume Kafka:
 
 ```bash
 docker compose -f demo/kafka/docker-compose.yml -p simpel-kafka-demo down -v
 ```
 
-Perintah tersebut hanya untuk project demo Kafka ini. Jangan menjalankan
-`down -v` pada compose utama ketika masih memerlukan data lab.
+> **Perhatian:** Flag `down -v` di atas hanya menghapus volume untuk project `simpel-kafka-demo`, dan aman dari compose stack utama SIMPEL.
 
-Sumber: [Apache Kafka Quick Start](https://kafka.apache.org/40/getting-started/quickstart/).
+Rujukan teknis: [Apache Kafka Quick Start Documentation](https://kafka.apache.org/40/getting-started/quickstart/).

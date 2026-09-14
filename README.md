@@ -1,51 +1,47 @@
 # SIMPEL Lab
 
-Lab praktik untuk PJJ *Implementasi dan Pengelolaan Message Broker untuk
-Arsitektur Microservices* (Pusdiklat KU, 14–25 September 2026).
+Repositori lab praktik untuk Pelatihan Jarak Jauh (PJJ) *Implementasi dan Pengelolaan Message Broker untuk Arsitektur Microservices* (Pusdiklat Keuangan Umum, BPPK Kemenkeu, 14–25 September 2026).
 
-Semua praktik memakai satu skenario fiktif yang sama: **SIMPEL — Sistem
-Perizinan Elektronik**. Nama layanannya tetap dalam bentuk ini di seluruh
-materi (modul, slide, narasi, lab):
+Seluruh sesi praktik menggunakan satu skenario domain konkret yang sama: **SIMPEL — Sistem Perizinan Elektronik**.
 
-Urutan bisnisnya adalah pengajuan → validasi → billing → notifikasi; tracking
-mencatat status. Pada demo `sinkron/`, gateway memanggil layanan satu per satu.
-Pada rancangan asinkron Lab 2, exchange merutekan event ke queue masing-masing
-consumer. Lab 5 sekarang menjalankan lima peran melalui `layanan/alur.js`,
-dengan acceptance DB+outbox, inbox per subscriber, status pengajuan, dan kompensasi.
-Nama queue `alur.*` terpisah dari latihan hari ketiga.
+Alur bisnis inti SIMPEL: `Pengajuan` → `Validasi` → `Billing` → `Notifikasi`, dengan `Tracking` yang mencatat audit log dan riwayat status:
+- Pada **versi synchronous** (`sinkron/`), Gateway memanggil setiap service hilir secara berantai melalui panggilan HTTP REST biasa.
+- Pada **versi asynchronous berbroker** (Lab 2 hingga Lab 5), Gateway mengamankan pengajuan via Transactional Outbox, kemudian RabbitMQ merutekan event ke queue masing-masing service consumer secara decoupled.
+- Pada **Lab 5**, alur end-to-end dijalankan penuh via `layanan/alur.js`, lengkap dengan inbox deduplikasi, polling status pengajuan, dan mekanisme kompensasi kegagalan.
 
-| Layanan | Peran | Sifat yang sengaja dipilih |
+| Layanan | Peran Bisnis | Karakteristik yang Disimulasikan |
 |---|---|---|
-| `gateway` | Terima pengajuan (HTTP) | Titik ukur response time |
-| `validasi` | Validasi dokumen | Demo sinkron: kerja CPU; Lab 3: I/O DB dengan pool terbatas |
-| `billing` | Terbitkan kode billing | Bergantung sistem eksternal, kadang mati → sumber LI-1 |
-| `notifikasi` | Kirim notifikasi | Lambat (pihak ketiga, \~3 dtk) → sumber LI-3 |
-| `tracking` | Audit & status | Konsumen kedua atas event yang sama → contoh pub-sub |
+| `gateway` | Menerima request pengajuan izin (HTTP) | Titik ukur ingress response time |
+| `validasi` | Validasi kelayakan dokumen pemohon | Beban komputasi CPU & operasi I/O database |
+| `billing` | Menerbitkan kode pembayaran ke bank | Bergantung pada API pihak ketiga, simulasi downtime |
+| `notifikasi` | Mengirim konfirmasi email/SMS ke pemohon | Latensi lambat (vendor eksternal ~3 detik) |
+| `tracking` | Pencatatan audit trail & riwayat status | Consumer independen yang menerima event yang sama (Pub-Sub) |
 
-> `SIMPEL` sepenuhnya fiktif, disederhanakan untuk pelatihan — bukan
-> representasi sistem INSW yang sebenarnya.
+> **Catatan:** Sistem `SIMPEL` sepenuhnya fiktif dan disederhanakan untuk kebutuhan pembelajaran teknis, bukan representasi dari sistem produksi INSW yang sebenarnya.
 
-## Isi repo
+---
 
-```
+## Struktur Repositori
+
+```text
 simpel-lab/
-  docker-compose.yml   RabbitMQ 4.x, Postgres, Prometheus, Grafana
-  .env.contoh           salin ke .env sebelum mulai
-  sinkron/               versi TANPA broker, sengaja rapuh — demo MP-2
-  layanan/               versi DENGAN broker — dibangun bertahap MP-6..MP-8
-  lab/                    panduan tiap lab praktik, langkah demi langkah
-  tools/beban.js          pembangkit beban, ukur p50/p95 & tingkat kegagalan
-  db/                     skema Postgres, dijalankan otomatis oleh compose
-  infra/                  konfigurasi Prometheus & Grafana
+  docker-compose.yml   Definisi container: RabbitMQ 4.x, PostgreSQL 16, Prometheus, Grafana
+  .env.contoh          Template konfigurasi environment (salin ke .env sebelum mulai)
+  sinkron/             Versi synchronous TANPA broker (sengaja dibuat rapuh untuk demo MP-02)
+  layanan/             Versi microservices DENGAN broker (dibangun bertahap di MP-06 s.d. MP-08)
+  lab/                 Panduan langkah demi langkah untuk setiap modul hands-on
+  tools/beban.js       Script generator beban untuk mengukur throughput, latensi p50/p95, dan error rate
+  db/                  Skema DDL PostgreSQL (dieksekusi otomatis saat container postgres inisialisasi)
+  infra/               Konfigurasi monitoring: Prometheus scrape rules & Grafana dashboards
 ```
 
-## Mulai cepat
+---
 
-Ikuti **`PANDUAN-SETUP.md`** — dikirim H-1, berisi langkah lengkap
-`docker compose up`, cara memverifikasi berhasil, troubleshooting, dan cara
-memakai broker cadangan kalau Docker Desktop diblokir kebijakan IT kantor.
+## Panduan Mulai Cepat
 
-Ringkas untuk yang sudah familiar:
+Bagi peserta baru, silakan baca **[`PANDUAN-SETUP.md`](PANDUAN-SETUP.md)** yang dikirim H-1 sebelum pelatihan. Panduan tersebut memuat langkah instalasi lengkap, instruksi `docker compose up`, cara verifikasi kesehatan container, dan panduan troubleshooting.
+
+Ringkasan cepat bagi yang sudah terbiasa dengan Docker dan Node.js:
 
 ```bash
 cp .env.contoh .env
@@ -53,41 +49,37 @@ docker compose up -d rabbitmq postgres
 npm install
 ```
 
-Lalu ikuti panduan lab sesuai jadwal hari itu:
+Setelah environment siap, ikuti modul lab sesuai jadwal harian:
 
-| Hari | Lab | Folder |
+| Hari | Lab / Sesi | Folder / Dokumen Panduan |
 |---|---|---|
-| 1 | Lab 0 — broker hidup | `lab/lab0-broker-hidup/` |
-| 1 | Demo sinkron (MP-2) | `sinkron/README.md` |
-| 2 | Lab 1 — bedah topologi (MP-04, 90 menit) | [Panduan Lab 1](lab/lab1-topologi/README.md) |
-| 2 | Lab 2 — desain integrasi (MP-05, 45 menit) | [Panduan dan lembar kerja](lab/lab2-desain/README.md) |
-| 2 | Demo instruktur Kafka (MP-04) | [Demo replay](demo/kafka/README.md) |
-| 3 | Lab 3 — producer/consumer, 180 menit | [Panduan dan uji](lab/lab3-producer-consumer/README.md) |
-| 3 | Lab 4A — fanout, 45 menit | [Panduan Lab 4A](lab/lab4-routing/README.md) |
-| 4 | Lab 4B — routing lanjutan, retry/DLQ, 90 menit | [Panduan Lab 4B](lab/lab4-routing/README-part2.md) |
-| 4 | Lab 5 — end-to-end dan pengukuran, 135 menit | [Panduan Lab 5](lab/lab5-integrasi/README.md) |
-| 5 | Lab 6 — monitoring dan izin, 90 menit | [Dashboard, alert, permission probe](lab/lab6-monitoring/README.md) |
-| 5 | Lab 7 — troubleshooting, 45 menit per kelompok | [Empat kasus dan worksheet](lab/lab7-troubleshooting/README.md) |
-| 5 / minggu 2 | Pengarahan Action Learning | [Template proyek dan checkpoint](lab/action-learning/TEMPLATE.md) |
+| 1 | Lab 0 — Verifikasi Broker Hidup | [`lab/lab0-broker-hidup/`](lab/lab0-broker-hidup/README.md) |
+| 1 | Demo Arsitektur Synchronous (MP-02) | [`sinkron/README.md`](sinkron/README.md) |
+| 2 | Lab 1 — Bedah Topologi RabbitMQ (MP-04, 90 menit) | [Panduan Lab 1](lab/lab1-topologi/README.md) |
+| 2 | Lab 2 — Desain Integrasi SIMPEL (MP-05, 45 menit) | [Panduan & Lembar Kerja Lab 2](lab/lab2-desain/README.md) |
+| 2 | Demo Instruktur Apache Kafka (MP-04) | [Panduan Demo Kafka](demo/kafka/README.md) |
+| 3 | Lab 3 — Producer, Consumer, & Manual Ack (MP-06, 180 menit) | [Panduan Lab 3](lab/lab3-producer-consumer/README.md) |
+| 3 | Lab 4A — Fanout & Independent Subscription (MP-07, 45 menit) | [Panduan Lab 4A](lab/lab4-routing/README.md) |
+| 4 | Lab 4B — Topic Routing, Backoff Retry, & DLQ (MP-07, 90 menit) | [Panduan Lab 4B](lab/lab4-routing/README-part2.md) |
+| 4 | Lab 5 — Integrasi End-to-End & Benchmark Beban (MP-08, 135 menit) | [Panduan Lab 5](lab/lab5-integrasi/README.md) |
+| 5 | Lab 6 — Monitoring Metrik, Alerting, & Security Probe (MP-09, 90 menit) | [Panduan Lab 6](lab/lab6-monitoring/README.md) |
+| 5 | Lab 7 — Troubleshooting Insiden Terdistribusi (MP-10, 45 menit/kelompok) | [Panduan Lab 7](lab/lab7-troubleshooting/README.md) |
+| 5 / Minggu 2 | Pengarahan & Pengerjaan Proyek Action Learning | [Template & Panduan Capstone](lab/action-learning/TEMPLATE.md) |
 
-Hari kelima memakai stack terpisah melalui `npm run operasi -- up` dan tidak
-membaca `.env` sebelumnya. Ikuti Lab 6 untuk port serta kredensial dummy lokal;
-volume Grafana lama tidak dimigrasikan. `npm run verify:day5` menguji metrik,
-alert, batas izin, empat repair dengan ID asli, dan pemulihan alarm memori
-pada project QA miliknya sendiri. Hentikan `simpel-ops` sebelum verifier karena
-port host sama. Shutdown peserta mempertahankan volume.
+---
 
-Hari keempat menyediakan `tools/beban-alur.js` untuk pembanding terkontrol
-dengan fungsi efek bisnis yang sama pada mode sync dan async. Ukur HTTP response,
-observed completion, dan tekanan DB secara terpisah. Ini berbeda dari demo
-CPU-bound hari pertama. Notifikasi hari keempat adalah receipt DB sintetis.
-`npm run verify:day4` menjalankan pemeriksaan terisolasi, termasuk dua burst 500;
-`npm run verify:day3` memeriksa regresi latihan sebelumnya. Jangan menjalankan
-keduanya bersamaan karena memakai port QA yang sama.
+## Catatan Khusus Praktik Lanjutan
 
-## Kenapa dua versi (`sinkron/` vs `layanan/`)?
+- **Hari 4 (Benchmark Alur Terkontrol)**:
+  Tersedia `tools/beban-alur.js` untuk menguji perbandingan performa antara mode synchronous dan asynchronous dengan beban bisnis yang identik. Di sini kita membedakan pengukuran *HTTP response time* (waktu ke balasan HTTP 202) versus *observed completion time* (waktu hingga seluruh proses bisnis selesai) serta memantau utilisasi koneksi database. Pengujian verifikasi terisolasi dapat dijalankan via `npm run verify:day4`.
 
-Prinsip pedagogis materi ini adalah **failure-first**: setiap konsep broker
-diajarkan dengan dulu merasakan sakitnya versi tanpa broker. `sinkron/`
-dirusak di depan kelas di MP-2 supaya masalahnya (LI-1, LI-3) terasa nyata
-sebelum solusinya (`layanan/`, dibangun bertahap mulai MP-6) dijelaskan.
+- **Hari 5 (Stack Monitoring & Troubleshooting Terisolasi)**:
+  Praktik monitoring dan troubleshooting dijalankan pada compose stack terpisah menggunakan perintah `npm run operasi -- up`. Stack ini menggunakan port dan volume mandiri (project `simpel-ops`) sehingga tidak mengganggu data lab hari-hari sebelumnya. Verifikasi komprehensif hari ke-5 dapat dijalankan via `npm run verify:day5`.
+
+---
+
+## Mengapa Dua Versi (`sinkron/` vs `layanan/`)?
+
+Pendekatan pembelajaran pelatihan ini menggunakan prinsip **failure-first**: peserta diajak memahami urgensi message broker dengan cara mengalami langsung kerapuhan arsitektur tanpa broker. 
+
+Arsitektur monolitik/berantai di folder `sinkron/` sengaja dirusak saat demo MP-02 agar dampak downtime parsial dan latensi kaskade terasa nyata, sebelum solusi berbasis message broker (`layanan/`) dibangun dan diuji secara bertahap mulai MP-06.

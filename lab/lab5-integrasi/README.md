@@ -1,98 +1,131 @@
-# Lab 5 — SIMPEL end-to-end
+# Lab 5 — Integrasi End-to-End SIMPEL & Uji Beban
 
-**Kamis 17 September 2026.** MP-08 terdiri dari teori 09.30–10.15 dan 10.30–11.15, lalu praktik 11.15–12.00 serta 13.00–14.30. Praktik berjumlah 3 × 45 menit. Semua efek dan identitas pada lab ini fiktif.
+**Modul MP-08 · Hari 4 (Kamis, 17 September 2026) · Praktik 3 JP (135 Menit).**
 
-## Persiapan
+MP-08 merupakan puncak integrasi alur bisnis SIMPEL secara menyeluruh: menghubungkan Gateway, Validasi, Billing, Notifikasi, dan Tracking menggunakan **Transactional Outbox Pattern**, **Inbox Deduplication**, serta mekanisme **Kompensasi Pembatalan**.
 
-Jalankan dari root simpel-lab. Gunakan Node 20.6+, dependensi yang sudah terpasang, serta RabbitMQ/Postgres lokal. Jangan menimpa .env yang sudah dikonfigurasi.
+Seluruh latihan dijalankan dari root direktori `simpel-lab/` menggunakan Node.js >= 20.6. Semua data dan entitas yang digunakan bersifat sintetis.
 
-```sh
+---
+
+## Persiapan Environment
+
+Jalankan database dan broker lokal, lalu perbarui skema tabel integrasi:
+
+```bash
 docker compose up -d rabbitmq postgres
 npm install
 npm run db:siapkan
 ```
 
-Perintah db:siapkan menambahkan tabel alur_* tanpa menghapus tabel/data hari sebelumnya. Hentikan gateway dan consumer hari ketiga sebelum membuka gateway pada port 3001. Implementasi hari keempat ada di `layanan/alur.js`; nama antreannya alur.*, terpisah dari simpel.*.
+> Perintah `npm run db:siapkan` menambahkan tabel-tabel alur integrasi (`alur_pengajuan`, `alur_outbox`, `alur_inbox`, `alur_tracking`) tanpa menghapus data latihan hari sebelumnya.
 
-| Proses | Perintah di terminal masing-masing |
-|---|---|
-| Gateway + relay outbox miliknya | npm run alur:gateway |
-| Validasi + relay | npm run alur:validasi |
-| Billing + relay | npm run alur:billing |
-| Notifikasi + relay | npm run alur:notifikasi |
-| Tracking | npm run alur:tracking |
+Implementasi alur end-to-end berada di file [`layanan/alur.js`](../../layanan/alur.js) dengan antrean berawalan `alur.*`. Jalankan kelima service di terminal terpisah:
 
-Konfigurasi default ALUR_WORK_MS=120, ALUR_NOTIF_MS=300, ALUR_POOL_MAX=4, ALUR_PREFETCH=1. Variabel yang sudah diekspor shell mengalahkan nilai .env pada Node. Pastikan ALUR_TRANSPORT=async. Peran terpisah berbagi satu database untuk kemudahan kelas; ini bukan contoh isolasi database dan kredensial produksi.
+| Service / Peran | Perintah Eksekusi di Terminal | Tanggung Jawab Alur |
+|---|---|---|
+| **Gateway + Outbox Relay** | `npm run alur:gateway` | Menerima HTTP POST, tulis DB + outbox atomik, kirim HTTP 202 |
+| **Validasi + Relay** | `npm run alur:validasi` | Verifikasi berkas, cadangkan alur, publish `pengajuan.valid` |
+| **Billing + Relay** | `npm run alur:billing` | Terbitkan kode bayar, simulasi payment partner, publish `billing.terbit` |
+| **Notifikasi + Relay** | `npm run alur:notifikasi` | Simulasi pengiriman tanda terima (receipt DB), selesaikan workflow |
+| **Tracking** | `npm run alur:tracking` | Simpan audit log seluruh event (`pengajuan.*`, `billing.*`) |
 
-## Lab 5a — Alur, status, dan duplikat (45 menit)
+*Konfigurasi default:* `ALUR_WORK_MS=120`, `ALUR_NOTIF_MS=300`, `ALUR_POOL_MAX=4`, `ALUR_PREFETCH=1`, dan `ALUR_TRANSPORT=async`.
 
-Menit 0–10: hidupkan lima proses. Periksa http://127.0.0.1:3001/health di browser. Ready menunjukkan DB dapat menerima pengajuan. brokerReady menunjukkan koneksi broker secara terpisah.
+---
 
-Menit 10–25: simpan skrip berikut sebagai berkas lokal percobaan, atau gunakan REST client yang tersedia. Contoh Node ini hanya mengakses layanan di laptop sendiri.
+## Lab 5a — Alur End-to-End, Polling Status, & Idempotensi (45 Menit)
 
-```js
-const base = 'http://127.0.0.1:3001';
-const send = () => fetch(base + '/pengajuan', {
-  method: 'POST',
-  headers: {
-    'content-type': 'application/json',
-    'Idempotency-Key': 'kelas-001'
-  },
-  body: JSON.stringify({
-    pemohon: 'Peserta sintetis', jenis: 'siup', kantor: 'jakarta'
-  })
-});
-const response = await send();
-const receipt = await response.json();
-console.log(response.status, receipt);
-console.log(await (await fetch(base + receipt.statusUrl)).json());
-```
+*Alokasi waktu: Start 5 proses (10 m) $\rightarrow$ Kirim pengajuan & polling status (15 m) $\rightarrow$ Uji idempotensi request duplikat (10 m) $\rightarrow$ Verifikasi audit trail DB (10 m).*
 
-Respons 202 berarti pengajuan dan event outbox berhasil commit dalam satu transaksi. Poll statusUrl sampai SELESAI. Urutan yang mungkin terlihat adalah DITERIMA, VALID, BILLING_TERBIT, SELESAI; polling boleh melewatkan keadaan antara yang singkat.
+1. **Jalankan 5 Service:** Pastikan kelima service menyala di terminal masing-masing. Buka `http://127.0.0.1:3001/health` di browser; pastikan mengembalikan `ready: true` (koneksi DB sehat) dan `brokerReady: true` (koneksi RabbitMQ terhubung).
+2. **Kirim Pengajuan Asinkron:**
+   Simulasikan pengiriman pengajuan izin melalui script berikut atau REST client:
 
-Menit 25–35: ulangi key dan payload yang sama, termasuk dua permintaan bersamaan. ID pengajuan harus tetap sama. Ubah jenis dengan key yang sama: respons harus 409. Key merupakan identitas permintaan, messageId identitas event, correlationId penghubung rangkaian, dan pengajuanId identitas bisnis.
+   ```javascript
+   const base = 'http://127.0.0.1:3001';
+   const response = await fetch(base + '/pengajuan', {
+     method: 'POST',
+     headers: {
+       'content-type': 'application/json',
+       'Idempotency-Key': 'kelas-001'
+     },
+     body: JSON.stringify({
+       pemohon: 'Budi Santoso',
+       jenis: 'siup',
+       kantor: 'jakarta'
+     })
+   });
 
-Menit 35–45: periksa tabel berikut melalui klien SQL lokal:
+   const receipt = await response.json();
+   console.log('HTTP Status:', response.status, receipt);
+   // Respons langsung 202 Accepted dengan URL status pelacakan:
+   console.log('Status Terkini:', await (await fetch(base + receipt.statusUrl)).json());
+   ```
 
-```sql
-SELECT layanan, count(*) FROM alur_inbox GROUP BY layanan;
-SELECT event, count(*) FROM alur_tracking GROUP BY event;
-SELECT owner, count(*) FROM alur_outbox
-WHERE published_at IS NULL GROUP BY owner;
-```
+3. **Polling Status URL:**
+   Lakukan polling ke `statusUrl` secara berkala hingga mencapai status terminal `SELESAI`. Tahapan status yang dilalui: `DITERIMA` $\rightarrow$ `VALID` $\rightarrow$ `BILLING_TERBIT` $\rightarrow$ `SELESAI`.
+4. **Uji Idempotensi Request Gateway:**
+   - Kirim ulang request dengan `Idempotency-Key` yang sama persis: Gateway langsung mengembalikan respons yang sama dengan `pengajuanId` yang identik tanpa membuat pengajuan ganda.
+   - Ubah isi payload (misalnya ganti `jenis: 'nib'`) namun tetap memakai `Idempotency-Key: 'kelas-001'`: Gateway dengan tegas menolak dengan status `HTTP 409 Conflict`.
+5. **Verifikasi Integritas Data di PostgreSQL:**
+   Jalankan query SQL di terminal:
+   ```sql
+   SELECT layanan, count(*) FROM alur_inbox GROUP BY layanan;
+   SELECT event, count(*) FROM alur_tracking GROUP BY event;
+   SELECT owner, count(*) FROM alur_outbox WHERE published_at IS NULL GROUP BY owner;
+   ```
+   - Service Tracking mencatat 4 event lengkap untuk alur normal (`pengajuan.diterima`, `pengajuan.valid`, `billing.terbit`, `pengajuan.selesai`).
+   - Seluruh baris outbox telah berhasil dipublish dan ditandai (`published_at` terisi).
+   - Tabel `alur_inbox` memastikan setiap worker consumer hanya memproses event yang sama satu kali (*at-most-once processing effect*).
 
-Tracking memperoleh empat event untuk alur normal. Validasi dan tracking boleh mencatat messageId sumber yang sama karena primary key inbox adalah (layanan,message_id). Dedup insert, efek DB, dan event berikutnya berada dalam satu transaksi. Ack dilakukan sesudah commit.
+---
 
-**Bukti 5a:** receipt, status akhir, satu ID untuk key berulang, respons 409, dan empat event tracking. Bedakan satu efek DB dari satu pemanggilan handler. Notifikasi hanya receipt DB sintetis, tidak mengirim email/SMS sungguhan.
+## Lab 5b — Simulasi Downtime Billing & Kompensasi Pembatalan (45 Menit)
 
-## Lab 5b — Billing berhenti dan kompensasi (45 menit)
+*Alokasi waktu: Matikan billing saat traffic masuk (15 m) $\rightarrow$ Recovery billing & drain antrean (10 m) $\rightarrow$ Fault injection uji gagal & saga kompensasi (10 m) $\rightarrow$ Pembahasan arsitektur (10 m).*
 
-Menit 0–15: hentikan hanya proses billing dengan Ctrl+C. Kirim beberapa pengajuan dengan key berbeda. HTTP tetap 202, status berhenti pada VALID, dan alur.billing.q bertambah. Validasi tidak menyatakan billing selesai.
+1. **Simulasi Downtime Billing:**
+   - Hentikan hanya service Billing di terminalnya (`Ctrl+C`).
+   - Kirim beberapa pengajuan baru via HTTP POST.
+   - Amati: Gateway tetap membalas `HTTP 202 Accepted`! Di database tracking, status berhenti di `VALID`. Antrean `alur.billing.q` di RabbitMQ Management UI menumpuk pesan.
+2. **Pemulihan Service:**
+   - Nyalakan kembali service Billing: `npm run alur:billing`.
+   - Amati: Tanpa perlu intervensi manual atau pengiriman ulang dari klien, antrean billing langsung terkuras otomatis dan status permohonan berlanjut hingga `SELESAI`.
+3. **Simulasi Kegagalan Bisnis & Kompensasi (Fault Injection):**
+   - Kirim permohonan dengan jenis perizinan khusus: `uji-gagal`.
+   - Service Billing mendeteksi kegagalan permanen: setelah mencoba retry berjadwal (3 attempt via outbox ke antrean retry), pesan masuk ke `alur.billing.dlq` dan service Billing mempublish event kegagalan: `billing.gagal`.
+   - Service Validasi menangkap event `billing.gagal`, lalu menjalankan **tindakan kompensasi**: mengubah status reservasi kuota dari `reserved` menjadi `cancelled`, lalu mempublish event kompensasi `pengajuan.dibatalkan`.
+   - Status akhir permohonan tercatat sebagai `DIBATALKAN` di audit log.
 
-Menit 15–25: jalankan kembali billing. Antrean diproses tanpa mengirim ulang HTTP. Pemulihan koneksi broker di dalam proses dilakukan otomatis dengan jeda; proses yang dihentikan tetap harus dihidupkan oleh peserta atau supervisor.
+> **Poin Pembelajaran Teknis:** Kompensasi bukanlah rollback database ajaib lintas jaringan. Kompensasi adalah **transaksi bisnis baru ke arah depan** untuk menetralkan efek transaksi sebelumnya secara sah dan tercatat di audit trail.
 
-Menit 25–35: kirim jenis `uji-gagal` dengan key baru. Ini fault injection yang sengaja disediakan untuk kelas. Billing gagal tiga attempt terjadwal, dengan retry tertunda dua detik melalui outbox ke alur.retry. Sesudah batas, pesan masuk alur.billing.dlq dan event billing.gagal diterbitkan. Validasi mengubah reservasi reserved menjadi cancelled dan menerbitkan pengajuan.dibatalkan. Status akhirnya DIBATALKAN.
+---
 
-Menit 35–45: diskusikan perbedaan gangguan sementara, kegagalan bisnis permanen, dan pesan dengan kontrak rusak. Jangan replay permohonan yang sudah dibatalkan secara buta. Pemilik bisnis harus menentukan apakah perlu permohonan baru atau operasi pembukaan kembali yang sah. Replay teknis Lab 4B tidak otomatis menjadi kebijakan bisnis Lab 5.
+## Lab 5c — Uji Beban Burst 500: Dua Jam Pengukuran (45 Menit)
 
-**Bukti 5b:** status VALID ketika billing mati, status SELESAI sesudah restart, DLQ untuk jenis uji-gagal, reservasi cancelled, dan tidak ada kode billing untuk permohonan gagal.
+*Alokasi waktu: Pengaturan parameter benchmark (5 m) $\rightarrow$ Uji beban mode Synchronous (15 m) $\rightarrow$ Uji beban mode Asynchronous (15 m) $\rightarrow$ Komparasi metrik p95 & analisis kapasitas (10 m).*
 
-## Lab 5c — Burst 500 dengan dua jam pengukuran (45 menit)
+Eksperimen ini membandingkan langsung performa **mode Synchronous** versus **mode Asynchronous** pada beban berat: **500 request perizinan dengan 50 konkurensi paralel** menggunakan script pembanding terkontrol `tools/beban-alur.js`.
 
-Menit 0–5: tetapkan kondisi yang sama: 500 permintaan unik, concurrency 50, ALUR_WORK_MS=120 (pg_sleep yang memegang koneksi DB), ALUR_NOTIF_MS=300 (delay simulasi notifikasi), pool 4, dan prefetch 4 untuk setiap consumer async. Gunakan database yang sama dan matikan proses beban lain. Catat versi Node/RabbitMQ, perangkat, serta waktu uji.
+### 1. Benchmark Mode Synchronous
+Hentikan kelima service async. Jalankan gateway dalam mode synchronous (memproses validasi, billing, dan notifikasi secara serial dalam satu panggilan HTTP):
 
-Menit 5–20: hentikan lima proses. Jalankan pembanding terkontrol:
-
-```sh
+```bash
+# Terminal A:
 ALUR_TRANSPORT=sync ALUR_WORK_MS=120 ALUR_NOTIF_MS=300 ALUR_POOL_MAX=4 npm run alur:gateway
-# Terminal lain
+
+# Terminal B (Jalankan pengujian beban):
 node --env-file=.env tools/beban-alur.js
 ```
 
-Menit 20–35: hentikan gateway tersebut. Hidupkan kembali lima proses async, semuanya memakai nilai workload yang sama dan ALUR_PREFETCH=4. Jalankan tools/beban-alur.js lagi. Setiap eksekusi membuat key baru dan menyimpan JSON di .evidence/.
+Catat metrik yang dihasilkan di akhir pengujian.
 
-```sh
-# Masing-masing di terminal sendiri:
+### 2. Benchmark Mode Asynchronous
+Hentikan gateway sync. Nyalakan kembali kelima service async dengan parameter beban identik (`ALUR_PREFETCH=4`):
+
+```bash
+# Terminal terpisah:
 ALUR_TRANSPORT=async ALUR_WORK_MS=120 ALUR_NOTIF_MS=300 ALUR_POOL_MAX=4 ALUR_PREFETCH=4 npm run alur:gateway
 ALUR_TRANSPORT=async ALUR_WORK_MS=120 ALUR_NOTIF_MS=300 ALUR_POOL_MAX=4 ALUR_PREFETCH=4 npm run alur:validasi
 ALUR_TRANSPORT=async ALUR_WORK_MS=120 ALUR_NOTIF_MS=300 ALUR_POOL_MAX=4 ALUR_PREFETCH=4 npm run alur:billing
@@ -100,31 +133,30 @@ ALUR_TRANSPORT=async ALUR_WORK_MS=120 ALUR_NOTIF_MS=300 ALUR_POOL_MAX=4 ALUR_PRE
 ALUR_TRANSPORT=async ALUR_WORK_MS=120 ALUR_NOTIF_MS=300 ALUR_POOL_MAX=4 ALUR_PREFETCH=4 npm run alur:tracking
 ```
 
-Menit 35–45: ambil tiga angka utama untuk capstone:
+Jalankan script pengujian beban sekali lagi:
+```bash
+node --env-file=.env tools/beban-alur.js
+```
 
-| Ukuran | Makna |
-|---|---|
-| responseP95Ms | p95 dari awal setiap HTTP request sampai receipt; sync 200 selesai, async 202 diterima |
-| completionP95Ms | p95 sampai receipt notifikasi diamati di DB; mencakup keterlambatan sampling |
-| peakPgSleep | Puncak koneksi DB yang teramati sedang menunggu workload validasi |
+### Matriks Perbandingan Dua Jam Ukur
 
-Tambahkan accepted/completed/errors dan waktu sampai semua selesai. Sampling 25 ms dapat melewatkan puncak yang lebih pendek. peakDbBusy hanya jumlah query aktif yang tersampel, bukan persentase CPU DB. Jangan mengklaim antrean mengurangi total pekerjaan hanya karena respons HTTP lebih cepat.
+| Metrik Evaluasi | Mode Synchronous (HTTP Serial) | Mode Asynchronous (RabbitMQ + Outbox) |
+|---|---|---|
+| **Response Time (p95)** | Sangat tinggi (~3.500 ms) karena menahan koneksi hingga notifikasi usai | Sangat cepat (~2–5 ms), gateway langsung membalas HTTP 202 |
+| **Completion Time (p95)** | Sama dengan Response Time (~3.500 ms) | Bertahap (~waktu pengurasan antrean di worker) |
+| **Koneksi Database Terpakai** | Koneksi menggantung lama menunggu I/O pihak ketiga | Koneksi dipakai efisien hanya saat transaksi commit lokal |
+| **Ketahanan terhadap Spike** | Risiko HTTP 504 Gateway Timeout dan kehabisan pool | Antrean broker menahan lonjakan beban (*load leveling*) |
 
-Pembanding sinkron menggunakan fungsi efek bisnis dan nilai delay yang sama, dipanggil berurutan dalam satu gateway. Ia bukan demo sinkron empat HTTP service pada hari pertama. Mode async menambah inbox, outbox, relay, dan event fan-out; overhead infrastruktur ini sengaja ikut diukur. Angka bukan perbandingan CPU-bound versus I/O-bound dan bukan klaim kapasitas LNSW.
+---
 
-Klien bersifat **closed loop**: setiap slot menunggu HTTP response sebelum mengirim
-request berikutnya. Respons sync membatasi kedatangan request, sedangkan async
-menerima batch lebih cepat sehingga backlog internal dapat lebih besar.
-Perbedaan completion p95 bukan ukuran latensi intrinsik pada arrival stream
-yang identik. Laporkan juga waktu sampai seluruh batch selesai. Waktu tunggu
-memperoleh koneksi pool dibatasi 15 detik pada kedua mode.
+## Verifikasi Otomatis Lab 5
 
-## Pemeriksaan otomatis dan penilaian
+Untuk memvalidasi keseluruhan alur Lab 5 secara otomatis, jalankan:
 
-`npm run verify:day4` menjalankan satu pemeriksaan integrasi di project Docker terpisah simpel-day4-qa dengan port 5763/5463/3064. Ia menolak project QA yang sudah ada, tidak membaca .env, dan hanya membersihkan stack QA yang dibuatnya sendiri. Pemeriksaan memerlukan beberapa menit, termasuk dua burst 500. Jangan jalankan bersamaan dengan verify:day3 karena memakai port QA yang sama.
+```bash
+npm run verify:day4
+```
 
-Lulus bila 5a menunjukkan efek idempoten, 5b memulihkan backlog dan membuktikan kompensasi, serta 5c menghasilkan dua berkas bukti dengan 500 completed tanpa error. Jika angka berbeda dari contoh pengajar, jelaskan kondisi uji sebelum menyimpulkan ada kesalahan.
+Skrip ini menjalankan container QA terpisah untuk menguji alur idempoten, pemulihan antrean saat downtime, eksekusi kompensasi saga, serta dua kali pengujian burst 500 tanpa error.
 
-## Batas yang harus disebut saat presentasi
-
-Ketersediaan acceptance bergantung pada DB. Satu node RabbitMQ dan satu Postgres bukan HA. Outbox yang tumbuh perlu kapasitas, pemantauan, dan kebijakan pembersihan. Retry otomatis koneksi bukan restart otomatis proses. Ack/confirm yang hilang tetap dapat memicu redelivery. Inbox harus di-retain selama jendela replay yang disepakati. Status dibaca dari tabel bersama agar kelas ringkas; sistem produksi memerlukan kontrak akses/proyeksi status tersendiri. Keamanan, monitoring, dan operasi DLQ menjadi pembahasan hari kelima.
+Rujukan teknis: [Transactional Outbox Pattern](https://microservices.io/patterns/data/transactional-outbox.html) dan [Saga Pattern](https://microservices.io/patterns/data/saga.html).

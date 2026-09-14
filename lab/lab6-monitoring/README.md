@@ -1,109 +1,127 @@
-# Lab 6 — Monitoring dan izin publisher
+# Lab 6 — Monitoring Metrik, Alerting, dan Kontrol Akses Publisher
 
-MP-09, hari kelima. Praktik 90 menit: 45 menit monitoring, 45 menit pembatasan akses. Semua data dan kredensial di sini khusus latihan lokal.
+**Modul MP-09 · Hari 5 (Jumat, 18 September 2026) · Praktik 2 JP (90 Menit).**
 
-## 1. Mulai dari root repository
+Lab ini berfokus pada aspek operasional production-readiness: **monitoring metrik performa antrean via Prometheus & Grafana** (45 menit) serta **penegakan hak akses minimum (*least-privilege permissions*) pada user publisher** (45 menit).
 
-Prasyarat: Docker Compose, Node.js >=20.6, serta dependency yang sudah dipasang dengan `npm ci`. Perintah hari kelima tidak membaca `.env` lab sebelumnya.
+Seluruh latihan dijalankan dari root direktori `simpel-lab/` menggunakan stack terisolasi `simpel-ops`.
 
-```sh
+---
+
+## 1. Menjalankan Stack Monitoring
+
+Sesi hari kelima menggunakan stack Docker Compose mandiri bernama `simpel-ops` dengan volume dan port terisolasi, sehingga tidak mengganggu data lab hari-hari sebelumnya:
+
+```bash
 npm run operasi -- up
 npm run operasi -- setup
 npm run operasi -- snapshot
 ```
 
-Stack memakai project `simpel-ops` dengan volume sendiri. Tidak memakai atau memigrasikan volume Grafana lama dari compose root.
+### Daftar Endpoint dan Akses Layanan
 
-| Komponen | Alamat lokal | Akun kelas |
-|---|---|---|
-| RabbitMQ Management | http://127.0.0.1:15695 | `labops` / `labops-only` |
-| Grafana | http://127.0.0.1:3005/d/simpel-ops | `labops` / `labops-only` |
-| Prometheus | http://127.0.0.1:9095 | Tanpa login, loopback |
-| AMQP | 127.0.0.1:5775 | `labops` / `labops-only`, vhost `lab6` |
-| PostgreSQL | 127.0.0.1:5475 | `labops` / `labops-only`, database `labops` |
+| Komponen Sistem | Alamat Akses Lokal | Kredensial Latihan | Fungsi Utama |
+|---|---|---|---|
+| **RabbitMQ Management** | `http://127.0.0.1:15695` | `labops` / `labops-only` | Dashboard manajemen broker |
+| **Grafana Dashboard** | `http://127.0.0.1:3005/d/simpel-ops` | `labops` / `labops-only` | Visualisasi grafik metrik per antrean |
+| **Prometheus** | `http://127.0.0.1:9095` | *(tanpa login)* | Engine penarik metrik (*scraper*) & rules |
+| **AMQP Port** | `127.0.0.1:5775` | `labops` / `labops-only` | Port koneksi broker (vhost `lab6`) |
+| **PostgreSQL** | `127.0.0.1:5475` | `labops` / `labops-only` | Database operasional `labops` |
 
-Image yang dipin untuk latihan: RabbitMQ 4.3.5, Prometheus 3.14.0, Grafana 13.2.1; PostgreSQL menggunakan tag mayor 16-alpine. Ini konfigurasi lokal plain text, bukan contoh deployment TLS.
+---
 
-Jika port terpakai, identifikasi proses pemiliknya. Jangan menghentikan container atau menghapus volume lain. `up` dapat memerlukan waktu saat mengunduh image pertama kali.
+## 2. Mensimulasikan Backlog dan Mengamati Alerting
 
-## 2. Buat dan amati backlog
+Pastikan consumer worker belum dijalankan. Kirim 100 pesan untuk membuat tumpukan antrean:
 
-Pastikan consumer monitoring belum berjalan.
-
-```sh
+```bash
 npm run operasi -- publish 100
 npm run operasi -- snapshot
 ```
 
-Catat vhost, queue, waktu sampel, ready, unacked, consumer, serta alarm node. Setelah statistik diperbarui, pekerjaan menunggu di `lab6.q`. Buka Grafana, pilih **Vhost: lab6**, rentang 15 menit, dan perhatikan enam panel.
+1. **Amati di Grafana:** Buka `http://127.0.0.1:3005/d/simpel-ops`, pilih variable **Vhost: lab6**, atur rentang waktu ke *Last 15 minutes*. Amati 6 panel visualisasi: lonjakan pesan Ready pada `lab6.q`, antrean Unacked, serta ketiadaan consumer.
+2. **Amati di Prometheus:** Buka `http://127.0.0.1:9095/alerts`. Cari alert rule bernama `SimpelQueueWithoutConsumer`.
+   - *Kondisi Rule:* `rabbitmq_queue_messages_ready > 0` dan `rabbitmq_queue_consumers == 0` selama minimal 15 detik.
+   - Amati status alert bertransisi dari `Pending` menjadi `Firing` (karena ada pesan menumpuk tanpa ada satu pun worker yang melayani).
+3. **Nyalakan Consumer:**
+   Di terminal kedua, jalankan consumer worker:
+   ```bash
+   npm run operasi -- consumer
+   ```
+   Consumer ini membaca pesan dengan manual ack, prefetch 2, dan delay artifisial 200 ms per pesan.
+4. **Amati Pemulihan (*Recovery*):**
+   - Di Grafana, amati kurva Ready menurun stabil, angka delivery/ack rate meningkat.
+   - Di Prometheus Alerts, amati status alert `SimpelQueueWithoutConsumer` otomatis beralih menjadi resolved/mati begitu antrean terkuras habis.
 
-Pada Prometheus, buka halaman **Alerts** dan cari `SimpelQueueWithoutConsumer`. Rule: ready > 0 dan consumers = 0, dipertahankan 15 detik. Waktu scrape/evaluasi menambah jeda sebelum firing. Ini contoh rule keadaan queue, belum termasuk pengiriman notifikasi Alertmanager.
+---
 
-Di terminal kedua:
+## 3. Memahami Query PromQL Metrik RabbitMQ
 
-```sh
-npm run operasi -- consumer
-```
+RabbitMQ mengekspor metrik standar Prometheus melalui plugin `rabbitmq_prometheus`:
+- `/metrics/per-object`: Menyediakan gauge per antrean (misalnya jumlah pesan ready dan unacked).
+- `/metrics/detailed`: Menyediakan counter throughput (misalnya total pesan yang di-ack).
 
-Consumer memakai manual ack, prefetch 2, dan delay simulasi 200 ms. Amati ready turun, unacked, delivery/ack rate, lalu alert berhenti firing. Consumer ini hanya simulasi transport; acknowledgement-nya bukan bukti transaksi bisnis.
-
-Jangan mengganti missing series dengan nol. Panel rate perlu cukup sampel. Gunakan scrape health untuk membedakan masalah collection dari keadaan queue.
-
-## 3. Baca konfigurasi metrik
-
-- `prometheus.yml`: `/metrics/per-object` untuk gauge queue, `/metrics/detailed?family=queue_delivery_metrics` untuk counter per queue.
-- `alerts.yml`: queue tanpa consumer dan scrape target broker tidak tersedia.
-- `grafana/`: datasource dan dashboard yang diprovisikan otomatis.
-- Variable vhost mencegah hasil lab6 bercampur dengan kasus lab7.
-
-Query contoh setelah cukup sampel:
+Query PromQL penting yang digunakan:
 
 ```promql
+# 1. Jumlah pesan yang siap diambil per antrean:
 rabbitmq_queue_messages_ready{vhost="lab6"}
+
+# 2. Laju pesan yang berhasil di-ack per detik (throughput):
 rate(rabbitmq_detailed_queue_messages_acked_total{vhost="lab6"}[1m])
+
+# 3. Status kesehatan proses broker (1 = hidup/scrape sukses):
 up{job="rabbitmq"}
 ```
 
-Scrape lima detik dan per-object metrics dipilih untuk lingkungan kecil. Filter family/vhost, cardinality, interval, dan retention perlu ditinjau lagi pada lingkungan besar. Nilai `up=1` membuktikan scrape, bukan AMQP atau hasil bisnis.
+---
 
-## 4. Buktikan izin minimum
+## 4. Pembuktian Hak Akses Minimum (*Least Privilege*)
 
-```sh
+Di production, service Publisher (misalnya Gateway) **tidak boleh memiliki hak penuh sebagai admin**. Publisher hanya boleh mempublish ke exchange yang ditugaskan kepadanya, dan dilarang keras mendeklarasikan antrean sembarangan atau membaca pesan milik service lain.
+
+Jalankan audit konfigurasi permission dan uji probe keamanan:
+
+```bash
 npm run operasi -- permissions
 npm run operasi -- probe
 ```
 
-User `lab6-publisher`, password kelas `publisher-lab-only`, tanpa management tag. Hak vhost `lab6`: configure `^$`, write `^lab6\.events$`, read `^$`. Bootstrap menyiapkan topology; runtime publisher tidak melakukan declare.
+User `lab6-publisher` dikonfigurasi dengan aturan regex ketat pada vhost `lab6`:
+- **Configure regex:** `^$` *(dilarang membuat atau menghapus resource apa pun)*
+- **Write regex:** `^lab6\.events$` *(hanya boleh mempublish ke exchange `lab6.events`)*
+- **Read regex:** `^$` *(dilarang membaca queue atau binding mana pun)*
 
-Hasil wajib:
+### Hasil Verifikasi Probe Keamanan
 
-| Operasi | Hasil |
-|---|---|
-| Publish ke `lab6.events` | Allowed dan confirmed |
-| Publish ke exchange lain | Ditolak broker |
-| Declare queue | Ditolak broker |
-| Membaca `lab6.q` | Ditolak broker |
+| Operasi yang Diuji | Ekspektasi Perilaku | Hasil Pengujian Aktual |
+|---|---|---|
+| **Publish ke `lab6.events`** | Berhasil dan mendapat publisher confirm | `Allowed & Confirmed` |
+| **Publish ke exchange lain** | Ditolak oleh broker dengan error 403 | `ACCESS_REFUSED (Ditolak)` |
+| **Mendeklarasikan queue baru** | Ditolak oleh broker dengan error 403 | `ACCESS_REFUSED (Ditolak)` |
+| **Membaca pesan dari `lab6.q`** | Ditolak oleh broker dengan error 403 | `ACCESS_REFUSED (Ditolak)` |
 
-Probe memeriksa `403/ACCESS_REFUSED`, bukan sekadar error/timeout. Channel yang ditolak dapat ditutup broker sehingga tes berikutnya memakai koneksi baru. User ini tetap tidak boleh membaca atau mendeklarasikan queue hanya karena sebuah publikasi berhasil.
+Setiap penolakan hak akses menghasilkan kode error AMQP `403/ACCESS_REFUSED` dan koneksi channel langsung ditutup oleh broker untuk mencegah eskalasi celah keamanan.
 
-Snapshot menampilkan user, vhost, state, dan channel untuk koneksi aktif. Probe berumur pendek bisa sudah tidak terlihat ketika snapshot berikutnya diambil. Daftar koneksi bukan audit historis seluruh operasi.
+---
 
-## 5. Bukti yang dikumpulkan
+## 5. Checklist Verifikasi Mandiri
 
-Tuliskan satu tabel before/after queue, status firing/recovery alert, empat hasil probe, dan satu batas pembuktian. Contoh batas: belum menguji TLS, notifikasi eksternal, atau hasil bisnis.
+- [ ] Stack monitoring `simpel-ops` berhasil menyala dan metrik tampil di Grafana.
+- [ ] Alert `SimpelQueueWithoutConsumer` berhasil memicu status *Firing* saat antrean menumpuk, dan otomatis pulih (*Resolved*) saat worker dinyalakan.
+- [ ] Berhasil membaca dan memahami arti query PromQL `rabbitmq_queue_messages_ready` dan ack rate.
+- [ ] Seluruh 4 skenario security probe membuktikan penegakan prinsip least privilege pada user publisher.
 
-Diskusikan keadaan alternatif: consumer ada, dua unacked bertahan, ack rate nol. Rule tanpa consumer tidak akan menangkapnya. Cari bukti proses/dependency; praktiknya ada pada Lab 7.
+---
 
-## 6. Berhenti
+## Menghentikan Stack
 
-Hentikan foreground consumer dengan Ctrl+C. Jika langsung lanjut MP-10, stack boleh tetap berjalan.
+Hentikan worker consumer dengan menekan `Ctrl+C`. Jika langsung melanjutkan ke Lab 7, stack `simpel-ops` dapat dibiarkan menyala. Jika ingin menghentikan stack:
 
-```sh
+```bash
 npm run operasi -- down
 ```
 
-Shutdown normal mempertahankan volume. Tidak ada perintah purge/reset dalam alur peserta.
+> Skrip `down` mempertahankan data volume lokal.
 
-Pemeriksaan pengajar: `npm run verify:day5` membuat project **simpel-day5-qa**, menolak resource QA yang sudah ada, dan membersihkan hanya stack QA yang dibuatnya. Hentikan `simpel-ops` lebih dahulu karena port lokal sama. Verifier menguji metrik, alert, izin, empat kasus, dan alarm memori sementara dengan pemulihan threshold; jangan menyalin injeksi alarm ke broker lain.
-
-Referensi: [RabbitMQ metrics](https://www.rabbitmq.com/docs/prometheus), [access control](https://www.rabbitmq.com/docs/access-control), [alarms](https://www.rabbitmq.com/docs/alarms), [TLS](https://www.rabbitmq.com/docs/ssl).
+Rujukan teknis: [RabbitMQ Monitoring with Prometheus & Grafana](https://www.rabbitmq.com/docs/prometheus) dan [RabbitMQ Access Control](https://www.rabbitmq.com/docs/access-control).

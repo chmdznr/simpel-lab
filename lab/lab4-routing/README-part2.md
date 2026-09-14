@@ -1,82 +1,113 @@
-# Lab 4B — Topic routing, retry, dan DLQ
+# Lab 4B — Topic Routing, Delayed Retry, dan DLQ
 
-**Kamis 17 September 2026, 08.00–09.30, 2 JP praktik.** Lanjutan Lab 4A. Semua data SIMPEL fiktif. Jalankan dari root simpel-lab dengan Node 20.6+ dan stack lokal aktif. Topologi memakai awalan lab4b sehingga tidak mengubah antrean hari ketiga.
+**Modul MP-07 (Bagian 2) · Hari 4 (Kamis, 17 September 2026) · Praktik 2 JP (90 Menit).**
 
-## Blok 7.3 — Routing berbasis jenis dan kantor (45 menit)
+Lab ini adalah kelanjutan dari Lab 4A. Seluruh latihan dijalankan dari root direktori `simpel-lab/` menggunakan Node.js >= 20.6 dan stack Docker lokal aktif. Semua nama resource menggunakan awalan `lab4b.*` agar tidak mengganggu antrean latihan hari sebelumnya.
 
-1. Menit 0–5: periksa `docker compose ps`, `node --version`, dan koneksi broker melalui `npm run routing -- setup`. Gunakan vhost masing-masing jika memakai broker kelas.
-2. Menit 5–12: tulis prediksi sebelum mengirim. Binding Jakarta adalah `pengajuan.*.jakarta`, binding SIUP adalah `pengajuan.siup.*`. Bintang menggantikan tepat satu kata. Tanda pagar menggantikan nol atau lebih kata.
-3. Menit 12–27: jalankan tiga perintah berikut. Catat messageId setiap publikasi.
+---
 
-```sh
-npm run routing -- publish pengajuan.siup.jakarta
-npm run routing -- publish pengajuan.nib.bandung
-npm run routing -- publish pengajuan.siup.bandung
-npm run routing -- inspect
-```
+## Blok 7.3 — Topic Routing Berbasis Jenis Izin dan Wilayah (45 Menit)
 
-| Routing key | Jakarta | SIUP | Cadangan |
+*Alokasi waktu: Verifikasi environment (5 m) $\rightarrow$ Prediksi matriks routing (7 m) $\rightarrow$ Uji publish 3 kasus (15 m) $\rightarrow$ Analisis bindings di UI (10 m) $\rightarrow$ Eksplorasi wildcard bertingkat (8 m).*
+
+1. **Persiapan:** Pastikan Docker aktif, lalu inisialisasi topologi routing:
+   ```bash
+   npm run routing -- setup
+   ```
+2. **Pahami Aturan Wildcard Topic:**
+   - Binding Jakarta: `pengajuan.*.jakarta` (wildcard `*` mencocokkan **tepat 1 kata** di antara `pengajuan` dan `jakarta`).
+   - Binding SIUP: `pengajuan.siup.*` (wildcard `*` mencocokkan **tepat 1 kata** setelah `pengajuan.siup`).
+   - Alternate Exchange: Exchange `lab4b.unmatched` bertipe fanout disiapkan sebagai jaring penampung pesan yang tidak cocok dengan binding mana pun.
+3. **Eksekusi 3 Perintah Publikasi:**
+   ```bash
+   npm run routing -- publish pengajuan.siup.jakarta
+   npm run routing -- publish pengajuan.nib.bandung
+   npm run routing -- publish pengajuan.siup.bandung
+   npm run routing -- inspect
+   ```
+
+### Matriks Hasil Perutean Topic
+
+| Routing Key yang Dipublish | Queue Jakarta | Queue SIUP | Queue Cadangan (*Unmatched*) |
 |---|---:|---:|---:|
-| pengajuan.siup.jakarta | 1 | 1 | 0 |
-| pengajuan.nib.bandung | 0 | 0 | 1 |
-| pengajuan.siup.bandung | 0 | 1 | 0 |
-| **Pertambahan jumlah ready** | **1** | **2** | **1** |
+| `pengajuan.siup.jakarta` | 1 | 1 | 0 |
+| `pengajuan.nib.bandung` | 0 | 0 | 1 |
+| `pengajuan.siup.bandung` | 0 | 1 | 0 |
+| **Pertambahan Pesan Ready** | **+1** | **+2** | **+1** |
 
-4. Menit 27–37: cocokkan pertambahan ready, bukan angka absolut jika antrean sudah berisi data. Periksa bindings di RabbitMQ Management. Bukalah kode `tools/routing.js`, fungsi declare. Hubungkan setiap binding dengan satu sel tabel.
-5. Menit 37–45: ubah prediksi untuk `pengajuan.*.*` versus `pengajuan.#`. Yang pertama memerlukan tepat tiga kata. Yang kedua menerima pengajuan dan semua turunannya. Jelaskan mengapa satu pesan dapat memperoleh dua salinan di dua antrean.
+4. **Analisis Hasil di Management UI:**
+   - Perhatikan bahwa pesan `pengajuan.siup.jakarta` masuk ke DUA queue sekaligus karena cocok dengan kedua binding pattern.
+   - Pesan `pengajuan.nib.bandung` tidak cocok dengan kedua antrean utama, sehingga otomatis dialihkan oleh broker ke Alternate Exchange menuju antrean cadangan.
+5. **Diskusi Wildcard `*` vs `#`:**
+   Pola `pengajuan.*.*` menuntut **tepat 3 segmen kata**, sedangkan pola `pengajuan.#` akan menerima `pengajuan.siup`, `pengajuan.siup.jakarta`, maupun `pengajuan.siup.jakarta.revisi`.
 
-**Bukti kelulusan 7.3:** tabel prediksi dan hasil, tiga messageId, serta tangkapan bindings. Rute cadangan ialah alternate exchange lab4b.unmatched bertipe fanout. Jika pesan sampai ke antrean cadangan, mandatory tidak mengembalikannya ke publisher. Confirm menunjukkan penerimaan broker, bukan keberhasilan proses bisnis.
+---
 
-## Blok 7.4 — Retry berjeda dan replay setelah perbaikan (45 menit)
+## Blok 7.4 — Delayed Retry Berjadwal dan Replay Terkendali (45 Menit)
 
-1. Menit 0–6: buka terminal A dan jalankan worker:
+*Alokasi waktu: Jalankan worker failure (6 m) $\rightarrow$ Uji simulasi retry (8 m) $\rightarrow$ Uji kegagalan permanen ke DLQ (10 m) $\rightarrow$ Replay pesan dari DLQ (12 m) $\rightarrow$ Analisis risiko produksi (9 m).*
 
-```sh
+Pada latihan ini, mekanisme delayed retry diimplementasikan dengan memanfaatkan fitur **Message TTL** dan **Dead-Letter Exchange (DLX)** bawaan RabbitMQ:
+- Pesan gagal dikirim ke antrean retry dengan TTL (misalnya 2.000 ms) tanpa ada consumer.
+- Begitu TTL kedaluwarsa, RabbitMQ secara otomatis mendead-letter pesan tersebut kembali ke antrean kerja utama melalui DLX.
+
+### 1. Jalankan Consumer Worker
+Di Terminal A, jalankan worker routing:
+```bash
 npm run routing -- worker
 ```
 
-2. Menit 6–14: terminal B mengirim simulasi gagal dua kali. Angka 2 adalah failUntil, bukan jumlah salinan pesan.
-
-```sh
+### 2. Simulasi Kegagalan Sementara (Transient Failure - Sembuh di Attempt 3)
+Di Terminal B, kirim job dengan parameter simulasi gagal 2 kali:
+```bash
 npm run routing -- job 2
 ```
 
-Worker mencatat attempt 1 retry, attempt 2 retry, attempt 3 processed. Setiap antrean retry memiliki message TTL 2.000 ms dan DLX menuju antrean kerja. Tidak ada consumer pada antrean retry. TTL bukan janji waktu penjadwalan yang tepat.
+Amati log Terminal A:
+- Attempt 1: Gagal $\rightarrow$ dialihkan ke antrean retry dengan TTL 2.000 ms.
+- Attempt 2: TTL habis, pesan kembali ke antrean kerja $\rightarrow$ dicoba lagi, masih gagal $\rightarrow$ kembali ke retry queue.
+- Attempt 3: TTL habis $\rightarrow$ dicoba lagi $\rightarrow$ **berhasil diproses!** (Log: `processed`).
 
-3. Menit 14–24: jalankan `npm run routing -- job 99`. Simulasi gagal terus, tetapi kode berhenti menjadwalkan retry pada attempt 3. Hasil terakhir terminal. Tidak ada jalur otomatis dari DLQ kembali ke antrean kerja.
+### 3. Simulasi Kegagalan Permanen (Masuk ke DLQ)
+Di Terminal B, kirim job yang disimulasikan gagal terus-menerus:
+```bash
+npm run routing -- job 99
+```
 
-```sh
+Amati log: Worker mencoba hingga attempt ke-3, kemudian menghentikan jadwal retry. Pesan secara permanen dialihkan ke antrean investigasi `lab4b.dlq`.
+Periksa isi DLQ tanpa menghapusnya (*peek*):
+```bash
 npm run routing -- inspect
 npm run routing -- peek
 ```
+Salin `messageId` yang berada di antrean terdepan (*head of DLQ*), misalnya `evt-xxxx`.
 
-Peek memakai manual acknowledgement dan mengembalikan pesan ke antrean. Ia tidak menghapus pesan. Salin messageId di kepala DLQ. Jangan mengarang ID baru.
+### 4. Perbaikan Dependensi & Replay Terkendali (Redrive)
+Simulasikan bahwa bug atau dependensi telah diperbaiki dengan environment variable `LAB4_REPAIRED=1`. Lakukan replay pesan dari DLQ:
 
-4. Menit 24–36: hentikan worker terminal A dengan Ctrl+C. Dalam latihan ini, perbaikan dependency disimulasikan dengan variabel LAB4_REPAIRED. Jalankan worker yang sudah diperbaiki, lalu replay satu pesan yang telah diperiksa.
-
-```sh
-# Terminal A
+```bash
+# Di Terminal A (Restart worker dalam kondisi sehat):
 LAB4_REPAIRED=1 npm run routing -- worker
-# Terminal B: ganti nilai ini dengan ID dari peek
+
+# Di Terminal B (Replay pesan spesifik dari DLQ):
 LAB4_REPAIRED=1 npm run routing -- replay evt-ID-DARI-PEEK
 ```
 
-Replay hanya menerima ID pesan di kepala DLQ. Pesan sumber diakui setelah publikasi ulang mendapat confirm. ID tetap sama, attempt untuk siklus pemulihan ini kembali 1. Pastikan processed muncul dan DLQ berkurang satu. Jika dependency sebenarnya belum diperbaiki, jangan replay.
+Amati bahwa:
+- Pesan dari DLQ dipublish ulang dengan `messageId` yang tetap sama persis.
+- Worker memprosesnya dengan sukses (`processed`), dan jumlah pesan di DLQ berkurang 1.
 
-5. Menit 36–45: jelaskan tiga celah kegagalan: proses mati sebelum publish, setelah publish tetapi sebelum ack, serta target DLX tidak tersedia. Tambahkan keputusan apakah replay perlu persetujuan pemilik proses bisnis.
+> **Peringatan Operasional:** Jangan pernah melakukan redrive massal dari DLQ secara membabi buta! Pastikan akar masalah teknis sudah teridentifikasi dan terselesaikan, serta pastikan consumer hilir memiliki proteksi idempotensi agar tidak menghasilkan duplikasi transaksi bisnis.
 
-**Bukti kelulusan 7.4:** log tiga attempt, jeda pengiriman ulang, isi DLQ, dan ID yang sama sebelum/sesudah replay. Dalam eksekusi tanpa crash ada maksimum tiga percobaan terjadwal. Redelivery karena koneksi putus dapat menambah pemanggilan handler dengan attempt yang sama. Efek nyata tetap memerlukan idempotensi seperti Lab 5.
+---
 
-## Troubleshooting dan batas
+## Panduan Troubleshooting
 
-| Gejala | Pemeriksaan berikutnya |
+| Gejala Masalah | Langkah Pemeriksaan & Tindakan |
 |---|---|
-| Queue count tidak sesuai | Bandingkan delta, vhost, bindings, dan ada/tidaknya consumer lain |
-| PRECONDITION_FAILED | Nama/topologi pernah dibuat dengan argumen berbeda; gunakan vhost lab bersih setelah menyimpan bukti |
-| Pesan tetap di retry | Periksa TTL, target DLX, dan binding work |
-| Worker berhenti | Periksa kontrak pesan dan broker; sumber yang belum di-ack dikembalikan ketika channel tutup |
-| Replay ditolak | Cocokkan kepala DLQ, messageId, dan variabel perbaikan |
+| **Jumlah antrean tidak sesuai** | Periksa vhost yang aktif, pastikan tidak ada consumer liar dari terminal lain |
+| **Error `PRECONDITION_FAILED`** | Antrean pernah dibuat sebelumnya dengan argumen yang berbeda; gunakan vhost bersih |
+| **Pesan tertahan di antrean retry** | Periksa konfigurasi message TTL dan target DLX binding |
+| **Replay ditolak oleh helper** | Pastikan ID yang dimasukkan sesuai dengan ID yang tampil pada perintah `npm run routing -- peek` |
 
-Tidak ada penghapusan massal atau reset volume dalam panduan ini. Default classic-queue dead-lettering tidak menjamin pemindahan tanpa kehilangan ketika target tidak tersedia. Untuk kebutuhan produksi, evaluasi quorum queue dengan at-least-once dead-lettering atau mekanisme relay terkonfirmasi. Lab 5 menggunakan outbox DB untuk retry tertunda agar keputusan retry dan pemindahan pekerjaan dapat dicatat secara atomik.
-
-**Rujukan:** [Topics](https://www.rabbitmq.com/tutorials/tutorial-five-javascript), [Alternate exchanges](https://www.rabbitmq.com/docs/ae), [TTL](https://www.rabbitmq.com/docs/ttl), [DLX safety](https://www.rabbitmq.com/docs/dlx).
+Rujukan teknis: [RabbitMQ Topics Tutorial](https://www.rabbitmq.com/tutorials/tutorial-five-javascript), [Alternate Exchanges](https://www.rabbitmq.com/docs/ae), [Time-To-Live (TTL)](https://www.rabbitmq.com/docs/ttl), dan [Dead Letter Exchanges](https://www.rabbitmq.com/docs/dlx).
