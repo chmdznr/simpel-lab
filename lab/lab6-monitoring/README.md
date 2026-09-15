@@ -114,6 +114,24 @@ Setiap penolakan hak akses menghasilkan kode error AMQP `403/ACCESS_REFUSED` dan
 
 ---
 
+## 6. Deliverable yang Dikumpulkan (Laporan Praktik)
+
+Praktik Lab 6 memiliki bobot penilaian **11,4% Nilai Total Pelatihan (NT)** sesuai instrumen penilaian MP-09 (Sesi 13 / Monitoring Metrik & Pengamanan Akses, total 10 poin):
+1. **Penyusunan & Pengamatan Grafana Dashboard (Bobot: 25% / 2.5 Poin):** Screenshot dashboard dengan 6 metrik kunci (Ready, Unacked, Consumers, Publish Rate, Ack Rate, Health) saat terjadi backlog pesan.
+2. **Pengujian & Siklus Hidup Alerting Prometheus (Bobot: 25% / 2.5 Poin):** Bukti transisi alert rule `SimpelQueueWithoutConsumer` dari status *Pending*, *Firing*, hingga *Resolved* saat worker pulih.
+3. **Analisis Query PromQL (Bobot: 20% / 2 Poin):** Penjelasan teknis query metrik per-object, counter throughput, dan evaluasi threshold alert.
+4. **Pembuktian Audit Hak Akses Least Privilege (Bobot: 20% / 2 Poin):** Output audit permission regex dan bukti 4 skenario security probe pada user publisher.
+5. **Analisis Mitigasi Keamanan & Best Practice (Bobot: 10% / 1 Poin):** Evaluasi risiko bila publisher memiliki akses superuser/admin dan rekomendasi proteksi credential broker.
+
+Peserta dapat mengisi dan mengumpulkan laporan menggunakan salah satu format berikut:
+- **Format Word (.docx):** Gunakan template resmi [**`lembar-laporan.docx`**](lembar-laporan.docx) *(disarankan)*.
+- **Format Markdown (.md):** Salin dan isi template [**`lembar-laporan.md`**](lembar-laporan.md).
+- **Format PDF (.pdf):** Ekspor dari berkas `.docx` atau `.md` yang telah diisi lengkap.
+
+Beri nama berkas sesuai format: `lab6-<nama-atau-nip-peserta>.<docx|md|pdf>` dan kumpulkan ke LMS / Google Drive kelas PJJ sesuai arahan fasilitator.
+
+---
+
 ## Menghentikan Stack
 
 Hentikan worker consumer dengan menekan `Ctrl+C`. Jika langsung melanjutkan ke Lab 7, stack `simpel-ops` dapat dibiarkan menyala. Jika ingin menghentikan stack:
@@ -125,3 +143,4 @@ npm run operasi -- down
 > Skrip `down` mempertahankan data volume lokal.
 
 Rujukan teknis: [RabbitMQ Monitoring with Prometheus & Grafana](https://www.rabbitmq.com/docs/prometheus) dan [RabbitMQ Access Control](https://www.rabbitmq.com/docs/access-control).
+

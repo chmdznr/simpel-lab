@@ -335,6 +335,8 @@ def main():
         ROOT / 'lab/lab3-producer-consumer/lembar-laporan.md',
         ROOT / 'lab/lab4-routing/lembar-laporan.md',
         ROOT / 'lab/lab5-integrasi/lembar-laporan.md',
+        ROOT / 'lab/lab6-monitoring/lembar-laporan.md',
+        ROOT / 'lab/lab7-troubleshooting/lembar-laporan.md',
     ]
     for md_file in labs:
         docx_file = md_file.with_suffix('.docx')

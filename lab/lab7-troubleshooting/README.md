@@ -78,24 +78,21 @@ Perintah `verify` dinyatakan **LULUS** apabila:
 
 ---
 
-## Format Lembar Kerja Laporan Investigasi
+## Deliverable yang Dikumpulkan (Laporan Praktik)
 
-Salin template berikut ke catatan kerja kelompok:
+Praktik Lab 7 memiliki bobot penilaian **5,7% Nilai Total Pelatihan (NT)** sesuai instrumen penilaian MP-10 (Sesi 14 / Troubleshooting Kasus Lapangan, total 10 poin):
+1. **Identifikasi Status Antrean & Observasi Metrik (Bobot: 20% / 2 Poin):** Pencatatan metrik vhost kasus (Ready, Unacked, Consumers) dan cuplikan log error/peringatan yang relevan.
+2. **Formulasi Dua Hipotesis Kerja (Bobot: 25% / 2.5 Poin):** Hipotesis primer dan hipotesis alternatif yang masuk akal secara teknis sebelum perbaikan dilakukan.
+3. **Uji Pembuktian Hipotesis & Logika Akar Masalah (Bobot: 25% / 2.5 Poin):** Langkah investigasi untuk membuktikan/menolak hipotesis dengan rujukan mekanisme AMQP.
+4. **Tindakan Perbaikan & Bukti Verifikasi (Bobot: 20% / 2 Poin):** Output lolos `npm run kasus -- verify <id>` (5/5 ID terproses, 0 duplikat, antrean bersih).
+5. **Rekomendasi Mitigasi Jangka Panjang (Bobot: 10% / 1 Poin):** Usulan pencegahan di level arsitektur / konfigurasi production agar insiden serupa tidak terulang.
 
-```text
-- Kasus yang ditangani: Kasus [A / B / C / D]
-- Anggota Tim: Operator: ________  Pencatat: ________  Penantang: ________
-- Observasi Awal:
-  * Vhost / Queue: ____________________
-  * Metrik: Ready = ____, Unacked = ____, Consumers = ____
-  * Pesan Log Penting: __________________________________________________
-- Hipotesis 1 (Dugaan Penyebab): ________________________________________
-- Hipotesis 2 (Dugaan Alternatif): ______________________________________
-- Uji Pembuktian Hipotesis & Hasilnya: __________________________________
-- Tindakan Perbaikan yang Dilakukan: ____________________________________
-- Hasil Verifikasi: (5/5 ID input sukses diproses, zero duplicate, queue bersih)
-- Catatan Pembelajaran / Mitigasi Jangka Panjang: _______________________
-```
+Peserta dapat mengisi dan mengumpulkan laporan menggunakan salah satu format berikut:
+- **Format Word (.docx):** Gunakan template resmi [**`lembar-laporan.docx`**](lembar-laporan.docx) *(disarankan)*.
+- **Format Markdown (.md):** Salin dan isi template [**`lembar-laporan.md`**](lembar-laporan.md).
+- **Format PDF (.pdf):** Ekspor dari berkas `.docx` atau `.md` yang telah diisi lengkap.
+
+Beri nama berkas sesuai format: `lab7-<nama-atau-nip-peserta>.<docx|md|pdf>` dan kumpulkan ke LMS / Google Drive kelas PJJ sesuai arahan fasilitator.
 
 ---
 
