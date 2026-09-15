@@ -18,7 +18,7 @@
 | Komponen Bukti | Bagian Praktik | Poin | Deskripsi Kriteria Kelulusan |
 |---|---|:---:|---|
 | **1. Definisi Publisher Confirm vs Manual Ack** | Bagian 3a & 3b | 2 | Ketepatan penjelasan konseptual perbedaan batas garansi antara broker dan database. |
-| **2. Bukti Crash Window & Deduplikasi** | Bagian 3b | 2 | Bukti log committed $\rightarrow$ force-kill $\rightarrow$ restart dengan `redelivered: true` dan `duplicate: true`, DB tetap 1 baris. |
+| **2. Bukti Crash Window & Deduplikasi** | Bagian 3b | 2 | Bukti log committed → force-kill → restart dengan `redelivered: true` dan `duplicate: true`, DB tetap 1 baris. |
 | **3. Bukti Rekonsiliasi 100 Pesan Outage** | Bagian 3c | 3 | Bukti seluruh 100 ID dari `.evidence/mati01.json` berhasil dipulihkan tanpa hilang ke database PostgreSQL. |
 | **4. Tabel Komparasi & Analisis Prefetch** | Bagian 3d | 3 | Tabel komparasi prefetch 1 vs 100 terisi lengkap dari log metrik worker disertai analisis bottleneck I/O database. |
 | **Total Nilai Tugas Lab 3** | | **10** | **Konversi Bobot: 17,1% NT** |

@@ -36,7 +36,7 @@ Implementasi alur end-to-end berada di file [`layanan/alur.js`](../../layanan/al
 
 ## Lab 5a — Alur End-to-End, Polling Status, & Idempotensi (45 Menit)
 
-*Alokasi waktu: Start 5 proses (10 m) $\rightarrow$ Kirim pengajuan & polling status (15 m) $\rightarrow$ Uji idempotensi request duplikat (10 m) $\rightarrow$ Verifikasi audit trail DB (10 m).*
+*Alokasi waktu: Start 5 proses (10 m) → Kirim pengajuan & polling status (15 m) → Uji idempotensi request duplikat (10 m) → Verifikasi audit trail DB (10 m).*
 
 1. **Jalankan 5 Service:** Pastikan kelima service menyala di terminal masing-masing. Buka `http://127.0.0.1:3001/health` di browser; pastikan mengembalikan `ready: true` (koneksi DB sehat) dan `brokerReady: true` (koneksi RabbitMQ terhubung).
 2. **Kirim Pengajuan Asinkron:**
@@ -64,7 +64,7 @@ Implementasi alur end-to-end berada di file [`layanan/alur.js`](../../layanan/al
    ```
 
 3. **Polling Status URL:**
-   Lakukan polling ke `statusUrl` secara berkala hingga mencapai status terminal `SELESAI`. Tahapan status yang dilalui: `DITERIMA` $\rightarrow$ `VALID` $\rightarrow$ `BILLING_TERBIT` $\rightarrow$ `SELESAI`.
+   Lakukan polling ke `statusUrl` secara berkala hingga mencapai status terminal `SELESAI`. Tahapan status yang dilalui: `DITERIMA` → `VALID` → `BILLING_TERBIT` → `SELESAI`.
 4. **Uji Idempotensi Request Gateway:**
    - Kirim ulang request dengan `Idempotency-Key` yang sama persis: Gateway langsung mengembalikan respons yang sama dengan `pengajuanId` yang identik tanpa membuat pengajuan ganda.
    - Ubah isi payload (misalnya ganti `jenis: 'nib'`) namun tetap memakai `Idempotency-Key: 'kelas-001'`: Gateway dengan tegas menolak dengan status `HTTP 409 Conflict`.
@@ -83,7 +83,7 @@ Implementasi alur end-to-end berada di file [`layanan/alur.js`](../../layanan/al
 
 ## Lab 5b — Simulasi Downtime Billing & Kompensasi Pembatalan (45 Menit)
 
-*Alokasi waktu: Matikan billing saat traffic masuk (15 m) $\rightarrow$ Recovery billing & drain antrean (10 m) $\rightarrow$ Fault injection uji gagal & saga kompensasi (10 m) $\rightarrow$ Pembahasan arsitektur (10 m).*
+*Alokasi waktu: Matikan billing saat traffic masuk (15 m) → Recovery billing & drain antrean (10 m) → Fault injection uji gagal & saga kompensasi (10 m) → Pembahasan arsitektur (10 m).*
 
 1. **Simulasi Downtime Billing:**
    - Hentikan hanya service Billing di terminalnya (`Ctrl+C`).
@@ -104,7 +104,7 @@ Implementasi alur end-to-end berada di file [`layanan/alur.js`](../../layanan/al
 
 ## Lab 5c — Uji Beban Burst 500: Dua Jam Pengukuran (45 Menit)
 
-*Alokasi waktu: Pengaturan parameter benchmark (5 m) $\rightarrow$ Uji beban mode Synchronous (15 m) $\rightarrow$ Uji beban mode Asynchronous (15 m) $\rightarrow$ Komparasi metrik p95 & analisis kapasitas (10 m).*
+*Alokasi waktu: Pengaturan parameter benchmark (5 m) → Uji beban mode Synchronous (15 m) → Uji beban mode Asynchronous (15 m) → Komparasi metrik p95 & analisis kapasitas (10 m).*
 
 Eksperimen ini membandingkan langsung performa **mode Synchronous** versus **mode Asynchronous** pada beban berat: **500 request perizinan dengan 50 konkurensi paralel** menggunakan script pembanding terkontrol `tools/beban-alur.js`.
 

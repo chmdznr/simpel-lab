@@ -23,9 +23,9 @@ Setiap kasus beroperasi pada vhost terpisah (`lab7-a` s.d. `lab7-d`) dengan 5 ev
 | Kasus | Perintah Inisialisasi | Titik Pengamatan Utama | Karakteristik Masalah |
 |---|---|---|---|
 | **Kasus A** | `npm run kasus -- prepare a` | Kolom Ready naik, Consumer = 0 | Worker consumer offline / tidak aktif |
-| **Kasus B** | `npm run kasus -- prepare b` $\rightarrow$ `worker b` | Antrean `unmatched` bertambah | Kesalahan binding key pada exchange |
-| **Kasus C** | `npm run kasus -- prepare c` $\rightarrow$ `worker c` | Pesan menggantung di kolom Unacked | Worker macet menanti dependensi eksternal |
-| **Kasus D** | `npm run kasus -- prepare d` $\rightarrow$ `worker d` | Siklus retry habis, pesan masuk DLQ | Kegagalan dependensi berulang & poison pill |
+| **Kasus B** | `npm run kasus -- prepare b` → `worker b` | Antrean `unmatched` bertambah | Kesalahan binding key pada exchange |
+| **Kasus C** | `npm run kasus -- prepare c` → `worker c` | Pesan menggantung di kolom Unacked | Worker macet menanti dependensi eksternal |
+| **Kasus D** | `npm run kasus -- prepare d` → `worker d` | Siklus retry habis, pesan masuk DLQ | Kegagalan dependensi berulang & poison pill |
 
 Contoh eksekusi untuk kelompok yang menangani **Kasus C**:
 

@@ -46,7 +46,7 @@ Gunakan nama domain event standar berikut:
 |---|---|---|
 | **0–5 m** | Bagi peran kelompok & rumuskan janji layanan | Fasilitator, Pencatat, Penantang, Penyaji; kriteria *accepted* vs *completed* |
 | **5–15 m** | Gambar diagram alur sukses (*happy path*) | Kotak service, exchange, queue, consumer, titik balasan HTTP 202, dan alur penolakan |
-| **15–25 m** | Lengkapi tabel routing & satu kontrak event | Tabel relasi Event $\rightarrow$ Exchange $\rightarrow$ Routing Key $\rightarrow$ Queue $\rightarrow$ Consumer; JSON envelope |
+| **15–25 m** | Lengkapi tabel routing & satu kontrak event | Tabel relasi Event → Exchange → Routing Key → Queue → Consumer; JSON envelope |
 | **25–35 m** | Uji ketahanan desain dengan 3 kartu gangguan | Tempat pesan menunggu, jadwal backoff retry, mekanisme idempotensi, pemilik DLQ |
 | **35–42 m** | Peer review silang antar-kelompok | Bertukar lembar kerja, temukan minimal 1 celah konkret, revisi 1 keputusan arsitektur |
 | **42–45 m** | Finalisasi & pengumpulan cetak biru | 1 lembar kerja, 1 keputusan utama + alasan, dan 1 risiko terbuka (*open risk*) |

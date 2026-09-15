@@ -8,7 +8,7 @@ Lab ini adalah kelanjutan dari Lab 4A. Seluruh latihan dijalankan dari root dire
 
 ## Blok 7.3 — Topic Routing Berbasis Jenis Izin dan Wilayah (45 Menit)
 
-*Alokasi waktu: Verifikasi environment (5 m) $\rightarrow$ Prediksi matriks routing (7 m) $\rightarrow$ Uji publish 3 kasus (15 m) $\rightarrow$ Analisis bindings di UI (10 m) $\rightarrow$ Eksplorasi wildcard bertingkat (8 m).*
+*Alokasi waktu: Verifikasi environment (5 m) → Prediksi matriks routing (7 m) → Uji publish 3 kasus (15 m) → Analisis bindings di UI (10 m) → Eksplorasi wildcard bertingkat (8 m).*
 
 1. **Persiapan:** Pastikan Docker aktif, lalu inisialisasi topologi routing:
    ```bash
@@ -45,7 +45,7 @@ Lab ini adalah kelanjutan dari Lab 4A. Seluruh latihan dijalankan dari root dire
 
 ## Blok 7.4 — Delayed Retry Berjadwal dan Replay Terkendali (45 Menit)
 
-*Alokasi waktu: Jalankan worker failure (6 m) $\rightarrow$ Uji simulasi retry (8 m) $\rightarrow$ Uji kegagalan permanen ke DLQ (10 m) $\rightarrow$ Replay pesan dari DLQ (12 m) $\rightarrow$ Analisis risiko produksi (9 m).*
+*Alokasi waktu: Jalankan worker failure (6 m) → Uji simulasi retry (8 m) → Uji kegagalan permanen ke DLQ (10 m) → Replay pesan dari DLQ (12 m) → Analisis risiko produksi (9 m).*
 
 Pada latihan ini, mekanisme delayed retry diimplementasikan dengan memanfaatkan fitur **Message TTL** dan **Dead-Letter Exchange (DLX)** bawaan RabbitMQ:
 - Pesan gagal dikirim ke antrean retry dengan TTL (misalnya 2.000 ms) tanpa ada consumer.
@@ -64,9 +64,9 @@ npm run routing -- job 2
 ```
 
 Amati log Terminal A:
-- Attempt 1: Gagal $\rightarrow$ dialihkan ke antrean retry dengan TTL 2.000 ms.
-- Attempt 2: TTL habis, pesan kembali ke antrean kerja $\rightarrow$ dicoba lagi, masih gagal $\rightarrow$ kembali ke retry queue.
-- Attempt 3: TTL habis $\rightarrow$ dicoba lagi $\rightarrow$ **berhasil diproses!** (Log: `processed`).
+- Attempt 1: Gagal → dialihkan ke antrean retry dengan TTL 2.000 ms.
+- Attempt 2: TTL habis, pesan kembali ke antrean kerja → dicoba lagi, masih gagal → kembali ke retry queue.
+- Attempt 3: TTL habis → dicoba lagi → **berhasil diproses!** (Log: `processed`).
 
 ### 3. Simulasi Kegagalan Permanen (Masuk ke DLQ)
 Di Terminal B, kirim job yang disimulasikan gagal terus-menerus:

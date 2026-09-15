@@ -16,7 +16,7 @@ Alokasi: 7 JP pengerjaan mandiri + 3 JP sesi sinkron (presentasi & evaluasi).
 
 ## 2. Arsitektur Sistem & Spesifikasi Kontrak Event
 
-- **Diagram Topologi:** Lampirkan diagram arsitektur yang memuat relasi Producer $\rightarrow$ Exchange (beserta tipenya) $\rightarrow$ Binding Key $\rightarrow$ Queue $\rightarrow$ Consumer Worker $\rightarrow$ Database.
+- **Diagram Topologi:** Lampirkan diagram arsitektur yang memuat relasi Producer → Exchange (beserta tipenya) → Binding Key → Queue → Consumer Worker → Database.
 - **Pilihan Pola Integrasi:** Jelaskan alasan pemilihan pola (Work Queue, Publish-Subscribe, atau Selective Routing).
 - **Janji Layanan (Acceptance vs Completion):** Kapan respons HTTP dikembalikan ke pengguna (misalnya via HTTP 202) dan kapan proses bisnis dinyatakan selesai tuntas.
 - **Spesifikasi Kontrak Event:** Tuliskan contoh schema JSON envelope lengkap (`event`, `schemaVersion`, `messageId`, `correlationId`, `occurredAt`, dan payload data).

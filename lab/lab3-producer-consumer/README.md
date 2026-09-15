@@ -11,7 +11,7 @@ Target akhir sesi: Gateway mempublish event dengan mekanisme Publisher Confirm; 
 Lab ini berfokus pada **lapisan transport pesan** berdasarkan rancangan Lab 2:
 - Status HTTP 202 dengan response `DITERIMA_BROKER` menandakan bahwa pesan telah berhasil dirutekan dan dikonfirmasi oleh broker (*publisher confirm*).
 - Pada tahap ini, Gateway belum menerapkan Transactional Outbox (Outbox DB akan diimplementasikan penuh di Lab 5).
-- Topologi mode `work`: `Gateway` $\rightarrow$ Topic Exchange `simpel.events` $\rightarrow$ Binding `pengajuan.diterima` $\rightarrow$ Queue `validasi.q` $\rightarrow$ satu atau beberapa *competing consumer workers*.
+- Topologi mode `work`: `Gateway` → Topic Exchange `simpel.events` → Binding `pengajuan.diterima` → Queue `validasi.q` → satu atau beberapa *competing consumer workers*.
 - Pesan dengan kontrak rusak dialihkan ke exchange `simpel.invalid` / routing key `pengajuan.invalid` untuk dikarantina. Mekanisme delayed retry dan DLQ operasional dibahas di Lab 4B.
 
 ---
@@ -24,7 +24,7 @@ Lab 3 merupakan komponen penilaian **Nilai Tugas (NT)** terbesar pada pelatihan 
 - **Format Pengumpulan:** Simpan salinan file dengan nama `lab3-<nama-atau-nip-peserta>.md` (atau ekspor ke PDF).
 - **Komponen Penilaian (Skala 10 Poin):**
   1. *Bagian 1 (2 Poin):* Definisi konseptual perbedaan garansi antara Publisher Confirm dan Manual Acknowledgment.
-  2. *Bagian 2 (2 Poin):* Bukti log crash window (`committed` $\rightarrow$ force-kill $\rightarrow$ restart dengan `redelivered: true` dan `duplicate: true`) dan verifikasi idempotensi DB tetap 1 baris.
+  2. *Bagian 2 (2 Poin):* Bukti log crash window (`committed` → force-kill → restart dengan `redelivered: true` dan `duplicate: true`) dan verifikasi idempotensi DB tetap 1 baris.
   3. *Bagian 3 (3 Poin):* Bukti rekonsiliasi 100 pesan pulih utuh saat consumer mati (`.evidence/mati01.json` vs `validationRows: 100`).
   4. *Bagian 4 (3 Poin):* Tabel komparasi metrik riil Prefetch 1 vs 100 beserta analisis objektif utilisasi pool koneksi database.
 
@@ -59,7 +59,7 @@ Pastikan service demo synchronous lama di port 3001 sudah dimatikan (`lsof -ti :
 
 ## 3a — Producer & Publisher Confirm (45 Menit)
 
-*Alokasi waktu: Penjelasan tujuan (5 m) $\rightarrow$ Analisis kontrak (8 m) $\rightarrow$ Tracing kode publish (8 m) $\rightarrow$ Eksekusi (8 m) $\rightarrow$ Uji batas respons HTTP (10 m) $\rightarrow$ Diskusi bukti (6 m).*
+*Alokasi waktu: Penjelasan tujuan (5 m) → Analisis kontrak (8 m) → Tracing kode publish (8 m) → Eksekusi (8 m) → Uji batas respons HTTP (10 m) → Diskusi bukti (6 m).*
 
 1. Buka file [`layanan/gateway/index.js`](../../layanan/gateway/index.js) dan [`layanan/messaging.js`](../../layanan/messaging.js).
    - Bedakan tiga level identitas: identitas bisnis `data.pengajuanId` (contoh: `SIM-001`), identitas event `messageId` (contoh: `evt-001`), dan penelusuran alur `correlationId` (contoh: `corr-001`).
@@ -74,7 +74,7 @@ Pastikan service demo synchronous lama di port 3001 sudah dimatikan (`lsof -ti :
    npm run kirim -- --count=1 --run=awal
    ```
    Bukti respons akan dicatat ke `.evidence/awal.json`. Periksa nilai status `confirmed` dan ID yang dihasilkan.
-4. Buka RabbitMQ Management UI di [http://localhost:15672](http://localhost:15672) (user: `simpel`, pass: `simpel123`) $\rightarrow$ tab **Queues** $\rightarrow$ antrean `validasi.q`.
+4. Buka RabbitMQ Management UI di [http://localhost:15672](http://localhost:15672) (user: `simpel`, pass: `simpel123`) → tab **Queues** → antrean `validasi.q`.
    Perhatikan kolom **Ready** bertambah menjadi 1. Jangan menekan tombol *Get messages* dengan mode *auto-ack* karena akan menghapus pesan uji.
 5. Di Terminal E, periksa database:
    ```bash
@@ -87,7 +87,7 @@ Pastikan service demo synchronous lama di port 3001 sudah dimatikan (`lsof -ti :
 
 ## 3b — Consumer & Manual Acknowledgment (45 Menit)
 
-*Alokasi waktu: Prediksi alur (5 m) $\rightarrow$ Analisis kode worker (8 m) $\rightarrow$ Eksekusi (8 m) $\rightarrow$ Tracing manual ack (8 m) $\rightarrow$ Simulasi crash & redelivery (10 m) $\rightarrow$ Pembahasan (6 m).*
+*Alokasi waktu: Prediksi alur (5 m) → Analisis kode worker (8 m) → Eksekusi (8 m) → Tracing manual ack (8 m) → Simulasi crash & redelivery (10 m) → Pembahasan (6 m).*
 
 1. Buka file [`layanan/worker.js`](../../layanan/worker.js). Perhatikan konfigurasi `noAck: false`, pemanggilan `channel.prefetch()`, transaksi `INSERT` ke PostgreSQL, dan pemanggilan `channel.ack(message)`.
 2. Di Terminal B, jalankan worker validasi:
@@ -106,7 +106,7 @@ Pastikan service demo synchronous lama di port 3001 sudah dimatikan (`lsof -ti :
    Cocokkan kelima business ID pada receipts dengan log `committed` di worker terminal B.
 4. **Analisis Tiga Jendela Kegagalan (Crash Windows):**
    - Crash *sebelum* INSERT DB: Pesan belum di-ack, broker mendeteksi koneksi putus dan mengirim ulang (*requeue/redeliver*). Data DB bersih.
-   - Crash *setelah commit DB tetapi sebelum ack*: Data bisnis sudah tersimpan di DB, tetapi ack hilang. Broker mengirim ulang pesan ke worker lain $\rightarrow$ memicu duplikasi jika consumer tidak idempoten!
+   - Crash *setelah commit DB tetapi sebelum ack*: Data bisnis sudah tersimpan di DB, tetapi ack hilang. Broker mengirim ulang pesan ke worker lain → memicu duplikasi jika consumer tidak idempoten!
    - Crash *setelah ack*: Transaksi tuntas, tidak ada masalah.
 5. **Uji Redelivery & Idempotensi Nyata:**
    - Hentikan worker di Terminal B dengan `Ctrl+C`.
@@ -140,7 +140,7 @@ Pastikan service demo synchronous lama di port 3001 sudah dimatikan (`lsof -ti :
 
 ## 3c — Uji Ketahanan: Consumer Down, 100 Pesan Tetap Selamat (45 Menit)
 
-*Alokasi waktu: Perumusan hipotesis (5 m) $\rightarrow$ Persiapan baseline (8 m) $\rightarrow$ Publish 100 pesan saat worker mati (8 m) $\rightarrow$ Monitoring queue depth (8 m) $\rightarrow$ Pemulihan worker & rekonsiliasi ID (10 m) $\rightarrow$ Kesimpulan (6 m).*
+*Alokasi waktu: Perumusan hipotesis (5 m) → Persiapan baseline (8 m) → Publish 100 pesan saat worker mati (8 m) → Monitoring queue depth (8 m) → Pemulihan worker & rekonsiliasi ID (10 m) → Kesimpulan (6 m).*
 
 1. Hentikan seluruh worker validasi dengan `Ctrl+C`. Biarkan Gateway tetap menyala.
 2. Pastikan metrik **Consumers** pada antrean `validasi.q` bernilai 0 di Management UI.
@@ -164,7 +164,7 @@ Pastikan service demo synchronous lama di port 3001 sudah dimatikan (`lsof -ti :
 
 ## 3d — Competing Consumers: Prefetch 1 vs Prefetch 100 (45 Menit)
 
-*Alokasi waktu: Setup variabel (5 m) $\rightarrow$ Eksperimen Prefetch 1 (8 m) $\rightarrow$ Pencatatan metrik (8 m) $\rightarrow$ Eksperimen Prefetch 100 (8 m) $\rightarrow$ Komparasi & analisis bottleneck (10 m) $\rightarrow$ Kesimpulan teknis (6 m).*
+*Alokasi waktu: Setup variabel (5 m) → Eksperimen Prefetch 1 (8 m) → Pencatatan metrik (8 m) → Eksperimen Prefetch 100 (8 m) → Komparasi & analisis bottleneck (10 m) → Kesimpulan teknis (6 m).*
 
 Uji coba ini menggunakan simulasi beban I/O database: `VALIDASI_KERJA_MS=120` dengan koneksi pool PostgreSQL dibatasi maksimal 4 per worker.
 
@@ -233,7 +233,7 @@ Setiap 1 detik dan saat worker dihentikan (`final: true`), worker mencetak metri
 | Distribusi beban antar worker (w1 / w2 / w3) | Sangat berimbang (~40 / ~40 / ~40) | Cenderung timpang jika ada variasi latensi |
 
 > **Prinsip Teknis & Analisis Bottleneck:**
-> 1. **Mengapa Prefetch 100 selesai lebih cepat pada uji coba ini?** Karena beban kerja simulasi ini adalah **I/O-bound** (`pg_sleep` di database), bukan CPU-bound. Dengan prefetch 100, ketiga worker dapat memanfaatkan batas pool database secara penuh (12 koneksi paralel $\rightarrow$ throughput teoritis $\approx 12 / 0{,}12 = 100$ msg/detik). Pada prefetch 1, setiap worker hanya memproses 1 pesan pada satu waktu sehingga total koneksi database yang terpakai hanya 3 (throughput teoritis $\approx 3 / 0{,}12 = 25$ msg/detik).
+> 1. **Mengapa Prefetch 100 selesai lebih cepat pada uji coba ini?** Karena beban kerja simulasi ini adalah **I/O-bound** (`pg_sleep` di database), bukan CPU-bound. Dengan prefetch 100, ketiga worker dapat memanfaatkan batas pool database secara penuh (12 koneksi paralel → throughput teoritis ≈ 12 / 0,12 = 100 msg/detik). Pada prefetch 1, setiap worker hanya memproses 1 pesan pada satu waktu sehingga total koneksi database yang terpakai hanya 3 (throughput teoritis ≈ 3 / 0,12 = 25 msg/detik).
 > 2. **Kelemahan Prefetch 100:** Backlog pesan berpindah dari antrean broker ke dalam memori aplikasi worker. Jika salah satu worker mengalami crash di tengah jalan, seluruh pesan in-flight yang tertimbun di memorinya harus dikembalikan ke broker (*requeue/redeliver*), meningkatkan risiko latensi kaskade dan ketidakadilan beban (*unfair distribution*).
 > 3. **Kesimpulan Arsitektur:** Nilai `prefetch` rendah (1–10) ideal untuk beban komputasi berat (*CPU-bound*) atau durasi kerja yang tidak seragam agar beban terbagi adil (*fair dispatch*). Nilai `prefetch` moderat (10–50) dipadukan dengan ukuran pool database yang memadai ideal untuk throughput I/O tinggi.
 

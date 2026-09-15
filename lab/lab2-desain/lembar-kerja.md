@@ -17,7 +17,7 @@
 ---
 
 ### 2. Diagram Alur Data & Kepemilikan State
-*(Gambarkan relasi: Pemohon $\rightarrow$ Gateway $\rightarrow$ Exchange $\rightarrow$ Queue $\rightarrow$ Consumer. Tandai titik balasan HTTP 202, cabang penolakan bisnis, dan service pemilik database di setiap tahap).*
+*(Gambarkan relasi: Pemohon → Gateway → Exchange → Queue → Consumer. Tandai titik balasan HTTP 202, cabang penolakan bisnis, dan service pemilik database di setiap tahap).*
 
 ```text
 [ Diagram Alur Sistem: Lampirkan gambar tangan atau sketsa diagram di lembar terpisah ]
@@ -28,13 +28,13 @@
 ### 3. Tabel Topologi Routing (Topic Exchange `simpel.events`)
 *(Tuliskan satu baris untuk setiap subscription antrean yang dibutuhkan)*
 
-| Nama Event Bisnis | Exchange & Tipe | Routing / Binding Key | Queue Tujuan $\rightarrow$ Consumer |
+| Nama Event Bisnis | Exchange & Tipe | Routing / Binding Key | Queue Tujuan → Consumer |
 |---|---|---|---|
-| `pengajuan.diterima` | `simpel.events` (topic) | `pengajuan.diterima` | `validasi.q` $\rightarrow$ Service Validasi |
-| `pengajuan.valid` | `simpel.events` (topic) | `pengajuan.valid` | `billing.q` $\rightarrow$ Service Billing |
-| `billing.terbit` | `simpel.events` (topic) | `billing.terbit` | `notifikasi.q` $\rightarrow$ Service Notifikasi |
-| `pengajuan.#` | `simpel.events` (topic) | `pengajuan.#` | `tracking.q` $\rightarrow$ Service Tracking |
-| `billing.#` | `simpel.events` (topic) | `billing.#` | `tracking.q` $\rightarrow$ Service Tracking |
+| `pengajuan.diterima` | `simpel.events` (topic) | `pengajuan.diterima` | `validasi.q` → Service Validasi |
+| `pengajuan.valid` | `simpel.events` (topic) | `pengajuan.valid` | `billing.q` → Service Billing |
+| `billing.terbit` | `simpel.events` (topic) | `billing.terbit` | `notifikasi.q` → Service Notifikasi |
+| `pengajuan.#` | `simpel.events` (topic) | `pengajuan.#` | `tracking.q` → Service Tracking |
+| `billing.#` | `simpel.events` (topic) | `billing.#` | `tracking.q` → Service Tracking |
 | | | | |
 
 ---
@@ -68,7 +68,7 @@
 | **Event duplikat (crash post-commit pre-ack)** | Kunci dedup teknis `(consumer, message_id)`: ____________________  Unique constraint database bisnis: ____________________ |
 
 - **Batas Percobaan Retry & Backoff:** 1 percobaan awal + 3 retry bertingkat (30s, 120s, 600s).
-- **Kepemilikan DLQ & Prosedur Redrive:** Exchange `simpel.dlx` $\rightarrow$ Queue `billing.dlq`. Pemilik: Tim Ops Billing; syarat redrive: bug diperbaiki & redrive bertahap via batch kecil.
+- **Kepemilikan DLQ & Prosedur Redrive:** Exchange `simpel.dlx` → Queue `billing.dlq`. Pemilik: Tim Ops Billing; syarat redrive: bug diperbaiki & redrive bertahap via batch kecil.
 
 ---
 

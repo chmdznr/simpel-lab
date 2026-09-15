@@ -14,7 +14,7 @@
 * **Kapan seluruh proses dinyatakan SELESAI (*completed*)?**  
   Proses dinyatakan selesai saat Service Billing berhasil menerbitkan kode pembayaran perizinan (`BIL-SIM-001`), menyimpannya di tabel database `alur_billing`, dan mem-publish event `billing.terbit`. Service Billing adalah pemilik (*owner*) status akhir penyelesaian transaksi tahap perizinan ini.
 * **Batas toleransi penundaan (*tolerable delay*) & persistensi data:**  
-  Toleransi latensi verifikasi berkas $\le 5$ detik; penerbitan billing $\le 15$ detik (saat lonjakan beban $\le 2$ menit). Seluruh antrean dideklarasikan `durable: true` dan pesan dikirim dengan flag `persistent: true` (delivery_mode = 2) untuk menjamin nol kehilangan data saat broker restart.
+  Toleransi latensi verifikasi berkas ≤ 5 detik; penerbitan billing ≤ 15 detik (saat lonjakan beban ≤ 2 menit). Seluruh antrean dideklarasikan `durable: true` dan pesan dikirim dengan flag `persistent: true` (delivery_mode = 2) untuk menjamin nol kehilangan data saat broker restart.
 
 ---
 
@@ -137,8 +137,8 @@ flowchart LR
 
 **Penjelasan Alur & Kepemilikan State:**
 1. **Happy Path (Alur Normal):**
-   * **Pemohon $\rightarrow$ Gateway:** Mengirim request HTTP POST pengajuan. Gateway menyimpan berkas pengajuan ke tabel `pengajuan` dan mencatat event di tabel Outbox dalam 1 transaksi database lokal atomik.
-   * **Gateway $\rightarrow$ Pemohon:** Mengembalikan respons cepat `HTTP 202 Accepted` bersama nomor pendaftaran `pengajuanId: "SIM-001"` dan URL pelacakan. Gateway kemudian me-relay event ke `simpel.events` dengan routing key `pengajuan.diterima`.
+   * **Pemohon → Gateway:** Mengirim request HTTP POST pengajuan. Gateway menyimpan berkas pengajuan ke tabel `pengajuan` dan mencatat event di tabel Outbox dalam 1 transaksi database lokal atomik.
+   * **Gateway → Pemohon:** Mengembalikan respons cepat `HTTP 202 Accepted` bersama nomor pendaftaran `pengajuanId: "SIM-001"` dan URL pelacakan. Gateway kemudian me-relay event ke `simpel.events` dengan routing key `pengajuan.diterima`.
    * **Validasi Service:** Mengambil pesan dari `validasi.q`, mencatat status verifikasi di `alur_validasi (status: 'reserved')`, lalu mem-publish event `validasi.selesai`.
    * **Billing Service:** Mengambil pesan dari `billing.q`, menerbitkan kode pembayaran di `alur_billing ('BIL-SIM-001')`, lalu mem-publish event `billing.terbit`.
    * **Notifikasi Service:** Mengambil pesan dari `notifikasi.q`, mengirimkan konfirmasi email/SMS pemohon, dan mencatatnya di `alur_notifikasi`.
@@ -152,14 +152,14 @@ flowchart LR
 
 ### 3. Tabel Topologi Routing (Topic Exchange `simpel.events`)
 
-| Nama Event Bisnis | Exchange & Tipe | Routing / Binding Key | Queue Tujuan $\rightarrow$ Consumer | Peran Pemrosesan |
+| Nama Event Bisnis | Exchange & Tipe | Routing / Binding Key | Queue Tujuan → Consumer | Peran Pemrosesan |
 |---|---|---|---|---|
-| `pengajuan.diterima` | `simpel.events` (topic) | `pengajuan.diterima` | `validasi.q` $\rightarrow$ Service Validasi | Validasi kelayakan dokumen dan perizinan |
-| `validasi.selesai` | `simpel.events` (topic) | `validasi.selesai` | `billing.q` $\rightarrow$ Service Billing | Penerbitan kode pembayaran billing |
-| `billing.terbit` | `simpel.events` (topic) | `billing.terbit` | `notifikasi.q` $\rightarrow$ Service Notifikasi | Pengiriman notifikasi email/SMS ke pemohon |
-| `pengajuan.#` | `simpel.events` (topic) | `pengajuan.#` | `tracking.q` $\rightarrow$ Service Tracking | Audit trail log siklus hidup pengajuan |
-| `billing.#` | `simpel.events` (topic) | `billing.#` | `tracking.q` $\rightarrow$ Service Tracking | Audit trail penerbitan & kegagalan billing |
-| `billing.gagal` | `simpel.events` (topic) | `billing.gagal` | `validasi.q` $\rightarrow$ Service Validasi | Kompensasi Saga: pembatalan reservasi izin |
+| `pengajuan.diterima` | `simpel.events` (topic) | `pengajuan.diterima` | `validasi.q` → Service Validasi | Validasi kelayakan dokumen dan perizinan |
+| `validasi.selesai` | `simpel.events` (topic) | `validasi.selesai` | `billing.q` → Service Billing | Penerbitan kode pembayaran billing |
+| `billing.terbit` | `simpel.events` (topic) | `billing.terbit` | `notifikasi.q` → Service Notifikasi | Pengiriman notifikasi email/SMS ke pemohon |
+| `pengajuan.#` | `simpel.events` (topic) | `pengajuan.#` | `tracking.q` → Service Tracking | Audit trail log siklus hidup pengajuan |
+| `billing.#` | `simpel.events` (topic) | `billing.#` | `tracking.q` → Service Tracking | Audit trail penerbitan & kegagalan billing |
+| `billing.gagal` | `simpel.events` (topic) | `billing.gagal` | `validasi.q` → Service Validasi | Kompensasi Saga: pembatalan reservasi izin |
 | `*` (pesan rusak) | `simpel.invalid` (direct) | `invalid` | `pengajuan.invalid` (DLQ) | Karantina pesan cacat skema untuk investigasi |
 
 ---
@@ -199,7 +199,7 @@ Berikut adalah contoh kontrak event `pengajuan.valid` / `validasi.selesai` yang 
 | Skenario Gangguan | Dampak Desain & Penanganan Teknis | Perilaku terhadap Pemohon / Status | Pemilik Pemulihan & Bukti |
 |---|---|---|---|
 | **1. Service Billing Down 10 Menit** | Pesan `validasi.selesai` tetap tersimpan aman di `billing.q` yang durable. Tidak ada pesan yang drop. Saat billing hidup kembali, worker memproses tumpukan pesan secara berurutan sesuai kapasitas prefetch. | Pemohon membuka URL tracking `/pengajuan/SIM-001/status` dan melihat status `"Menunggu Penerbitan Kode Billing"`. Tidak ada HTTP 504 Gateway Timeout. | **Pemilik:** Admin Billing & SRE.<br/>**Bukti:** Grafik antrean `billing.q` di Prometheus naik selama 10 menit, lalu surut ke nol setelah worker hidup kembali tanpa ada data hilang. |
-| **2. Notifikasi Lambat (3 detik/pesan)** | `notifikasi.q` terisolasi secara independen dari alur utama. Lonjakan antrean di `notifikasi.q` tidak membebani `billing.q` maupun `validasi.q`. | Status izin dan kode billing pemohon sudah terbit secara sah di sistem. Hanya pengiriman email pengingat yang mengalami sedikit penundaan (*eventual delivery*). | **Pemilik:** Tim Notifikasi.<br/>**Bukti:** Billing selesai dalam $\le 1$ detik; log pengiriman email bertahap memproses antrean notifikasi tanpa error. |
+| **2. Notifikasi Lambat (3 detik/pesan)** | `notifikasi.q` terisolasi secara independen dari alur utama. Lonjakan antrean di `notifikasi.q` tidak membebani `billing.q` maupun `validasi.q`. | Status izin dan kode billing pemohon sudah terbit secara sah di sistem. Hanya pengiriman email pengingat yang mengalami sedikit penundaan (*eventual delivery*). | **Pemilik:** Tim Notifikasi.<br/>**Bukti:** Billing selesai dalam ≤ 1 detik; log pengiriman email bertahap memproses antrean notifikasi tanpa error. |
 | **3. Worker Crash Sebelum Kirim Ack (Duplikat)** | Broker melakukan *redelivery* pesan yang sama ke worker lain (`redelivered: true`). Worker menggunakan tabel deduplikasi `alur_inbox (owner, message_id)`. Transaksi database kedua dibatalkan via advisory lock / unique constraint `pengajuan_id`. Worker langsung mengirimkan `channel.ack()`. | Pemohon tetap menerima satu kode billing unik (`BIL-SIM-001`). Tidak pernah ada penagihan ganda (*double billing*). | **Pemilik:** Worker Consumer.<br/>**Bukti:** Log terminal menampilkan `{"duplicate":"evt-..."}`, tabel `alur_billing` hanya berisi tepat 1 baris untuk `SIM-001`. |
 
 * **Kebijakan Retry & DLQ:**

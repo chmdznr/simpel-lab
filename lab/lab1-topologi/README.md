@@ -23,8 +23,8 @@ Seluruh latihan Lab 1 dilakukan melalui **RabbitMQ Management UI** untuk membeda
 4. Siapkan kode peserta Anda, misalnya `p01`. Ganti contoh `p01` pada panduan ini dengan kode Anda sendiri. (Nama resource diawali `lab1.*` karena setiap peserta bekerja pada vhost terisolasi).
 
 **Alokasi Waktu:**
-- **Lab 1A (45 menit):** Setup akun & vhost (10 m) $\rightarrow$ Direct Exchange (12 m) $\rightarrow$ Fanout Exchange (12 m) $\rightarrow$ Review & pencatatan (11 m).
-- **Lab 1B (45 menit):** Topic Exchange (12 m) $\rightarrow$ Headers Exchange (12 m) $\rightarrow$ Eksplorasi Quorum Queue (8 m) $\rightarrow$ Diagram & pembahasan (13 m).
+- **Lab 1A (45 menit):** Setup akun & vhost (10 m) → Direct Exchange (12 m) → Fanout Exchange (12 m) → Review & pencatatan (11 m).
+- **Lab 1B (45 menit):** Topic Exchange (12 m) → Headers Exchange (12 m) → Eksplorasi Quorum Queue (8 m) → Diagram & pembahasan (13 m).
 
 ---
 
@@ -68,20 +68,20 @@ Seluruh latihan Lab 1 dilakukan melalui **RabbitMQ Management UI** untuk membeda
      - `lab1.fanout.validasi`
      - `lab1.fanout.tracking`
 3. **Membuat Binding**:
-   - Buka detail exchange `lab1.direct` $\rightarrow$ bagian **Bindings → Add binding from this exchange**.
+   - Buka detail exchange `lab1.direct` → bagian **Bindings → Add binding from this exchange**.
    - Masukkan To queue: `lab1.direct.validasi`, Routing key: `pengajuan.siup.jakarta`, lalu klik **Bind**.
-   - Buka detail exchange `lab1.fanout` $\rightarrow$ bind ke `lab1.fanout.validasi` (Routing key dikosongkan).
-   - Masih di `lab1.fanout` $\rightarrow$ bind ke `lab1.fanout.tracking` (Routing key dikosongkan).
+   - Buka detail exchange `lab1.fanout` → bind ke `lab1.fanout.validasi` (Routing key dikosongkan).
+   - Masih di `lab1.fanout` → bind ke `lab1.fanout.tracking` (Routing key dikosongkan).
 
 ### 2. Prosedur Uji Coba Pengiriman Pesan
 
 1. Tuliskan prediksi queue mana yang akan menerima pesan sebelum menekan tombol publish.
-2. Buka detail exchange asal $\rightarrow$ bagian **Publish message**.
+2. Buka detail exchange asal → bagian **Publish message**.
 3. Masukkan **Routing key** sesuai tabel di Bagian D.
 4. Pada bagian **Properties**, tambahkan properti dengan nama `delivery_mode` dan nilai `2` (*persistent*).
 5. Masukkan payload JSON sederhana, misalnya: `{"case":"D1","pengajuanId":"SIM-001"}`.
 6. Klik **Publish message**. Amati perubahan kolom **Ready** pada queue tujuan.
-7. Buka queue tujuan $\rightarrow$ bagian **Get messages**, isi Messages `1`, Ack Mode pilih **Automatic ack**, lalu klik **Get Message(s)** untuk memeriksa isi pesan dan mengosongkan antrean lab.
+7. Buka queue tujuan → bagian **Get messages**, isi Messages `1`, Ack Mode pilih **Automatic ack**, lalu klik **Get Message(s)** untuk memeriksa isi pesan dan mengosongkan antrean lab.
 
 ---
 
@@ -95,9 +95,9 @@ Seluruh latihan Lab 1 dilakukan melalui **RabbitMQ Management UI** untuk membeda
    - `lab1.topic.siup`
    - `lab1.headers.jakarta`
 3. Konfigurasi binding:
-   - Bind `lab1.topic` $\rightarrow$ `lab1.topic.jakarta` dengan routing key: `pengajuan.*.jakarta`
-   - Bind `lab1.topic` $\rightarrow$ `lab1.topic.siup` dengan routing key: `pengajuan.siup.#`
-   - Bind `lab1.headers` $\rightarrow$ `lab1.headers.jakarta` dengan key kosong, lalu tambahkan tiga baris **Arguments** bertipe **String**:
+   - Bind `lab1.topic` → `lab1.topic.jakarta` dengan routing key: `pengajuan.*.jakarta`
+   - Bind `lab1.topic` → `lab1.topic.siup` dengan routing key: `pengajuan.siup.#`
+   - Bind `lab1.headers` → `lab1.headers.jakarta` dengan key kosong, lalu tambahkan tiga baris **Arguments** bertipe **String**:
      - `x-match` = `all`
      - `jenis` = `siup`
      - `kantor` = `jakarta`
