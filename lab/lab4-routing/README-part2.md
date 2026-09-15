@@ -10,8 +10,13 @@ Lab ini adalah kelanjutan dari Lab 4A. Seluruh latihan dijalankan dari root dire
 
 *Alokasi waktu: Verifikasi environment (5 m) → Prediksi matriks routing (7 m) → Uji publish 3 kasus (15 m) → Analisis bindings di UI (10 m) → Eksplorasi wildcard bertingkat (8 m).*
 
-1. **Persiapan:** Pastikan Docker aktif, lalu inisialisasi topologi routing:
+1. **Persiapan Lingkungan & Inisialisasi Topologi:**
+   Pastikan container broker RabbitMQ dan database aktif (terutama saat memulai sesi baru Hari 4):
    ```bash
+   # Nyalakan container broker & database jika belum aktif
+   docker compose up -d rabbitmq postgres
+
+   # Inisialisasi topologi exchange, queue, dan retry DLQ Lab 4B
    npm run routing -- setup
    ```
 2. **Pahami Aturan Wildcard Topic:**

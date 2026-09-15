@@ -30,20 +30,35 @@ Praktik Lab 4 mencakup modul MP-07 Bagian 1 (Hari 3) dan Bagian 2 (Hari 4) denga
 
 ---
 
-## Tahapan Praktik (45 Menit)
+## Prasyarat Lingkungan dan Terminal
 
-### 1. Menit 0–5: Prediksi Alur Fanout
-Buat sketsa diagram satu Fanout Exchange yang terhubung ke dua queue terpisah. Buat prediksi tertulis: apa yang terjadi jika salah satu subscriber (misalnya service Tracking) mati saat event dipublish?
+Jalankan seluruh perintah dari **root repository `simpel-lab/`**, dengan Node.js >= 20.6, Docker aktif, dan konfigurasi `.env` siap:
 
-### 2. Menit 5–10: Persiapan Environment
-Hentikan Gateway dan seluruh worker dari Lab 3 (`Ctrl+C`). Pastikan port 3001 sudah bebas dari proses sebelumnya, lalu jalankan pembaruan tabel database:
 ```bash
-# Pastikan port 3001 bebas
+# Salin konfigurasi template jika file .env belum ada
+cp -n .env.contoh .env
+
+# Pastikan container broker dan database aktif
+docker compose up -d rabbitmq postgres
+
+# Pastikan port 3001 bebas dari proses sebelumnya
 lsof -ti :3001 | xargs kill -9 2>/dev/null
 
 # Siapkan skema database lab
 npm run db:siapkan
 ```
+
+> **Deklarasi Topologi Otomatis:** Sama seperti Lab 3, antrean `simpel.fanout`, `validasi.fanout.q`, dan `tracking.q` otomatis dideklarasikan secara idempoten oleh kode aplikasi saat gateway/worker dinyalakan dengan `SIMPEL_MODE=fanout`. Anda tidak perlu membuatnya secara manual di Management UI.
+
+---
+
+## Tahapan Praktik (45 Menit)
+
+### 1. Menit 0–5: Prediksi Alur Fanout
+Buat sketsa diagram satu Fanout Exchange yang terhubung ke dua queue terpisah. Buat prediksi tertulis: apa yang terjadi jika salah satu subscriber (misalnya service Tracking) mati saat event dipublish?
+
+### 2. Menit 5–10: Persiapan Proses Terminal
+Hentikan Gateway dan seluruh worker dari Lab 3 (`Ctrl+C`). Pastikan port 3001 sudah bebas dari proses sebelumnya (sudah dijalankan pada langkah prasyarat di atas).
 
 ### 3. Menit 10–15: Menjalankan Stack Fanout
 Buka tiga tab terminal terpisah di root folder `simpel-lab/`:
