@@ -8,16 +8,39 @@ Seluruh latihan dijalankan dari root direktori `simpel-lab/` menggunakan Node.js
 
 ---
 
+## Deliverable yang Dikumpulkan (Laporan Praktik)
+
+Lab 5 merupakan penilaian **Nilai Tugas (NT) berbobot 14,3% (5 JP)**. Setiap peserta wajib mengumpulkan satu berkas laporan mandiri:
+
+- **Template Laporan:** Gunakan formulir Markdown yang telah disediakan di **[`lembar-laporan.md`](lembar-laporan.md)**.
+- **Format Pengumpulan:** Simpan salinan file dengan nama `lab5-<nama-atau-nip-peserta>.md` (atau ekspor ke PDF).
+- **Komponen Penilaian (Skala 10 Poin):**
+  1. *Bagian 1 (3 Poin):* Bukti alur end-to-end (Gateway → Validasi → Billing → Notifikasi → Tracking), polling status hingga `SELESAI`, bukti konsistensi 4 tabel audit, serta penolakan idempotensi HTTP 409 saat reuse key dengan payload berbeda.
+  2. *Bagian 2 (3 Poin):* Bukti ketahanan downtime saat Billing mati (antrean menampung tanpa HTTP 504), pemulihan otomatis saat Billing hidup kembali, dan bukti kompensasi pembatalan Saga saat fault injection `uji-gagal` (reservasi dibatalkan).
+  3. *Bagian 3 (4 Poin):* Tabel komparasi metrik uji beban 500 request (Mode Sinkron vs Mode Asinkron: p95 response time, p95 completion time, utilisasi DB pool) beserta analisis arsitektural keunggulan asinkron.
+
+---
+
 ## Persiapan Environment
 
-Jalankan database dan broker lokal, lalu perbarui skema tabel integrasi:
+Jalankan seluruh perintah dari **root direktori `simpel-lab/`**, menggunakan Node.js >= 20.6, Docker aktif, dan konfigurasi `.env` yang sudah disiapkan:
 
 ```bash
+# Pastikan file .env tersedia
+cp -n .env.contoh .env
+
+# Pastikan port 3001 bebas dari proses sebelumnya
+lsof -ti :3001 | xargs kill -9 2>/dev/null
+
+# Jalankan broker dan database
 docker compose up -d rabbitmq postgres
 npm install
 npm run db:siapkan
 ```
 
+> **Topologi Dibuat Otomatis oleh Kode Aplikasi (*Programmatic Declaration*):**
+> Sama seperti Lab 3 dan Lab 4, seluruh exchange (`alur.events`, `alur.retry`, `alur.dead`) dan queue (`alur.validasi.q`, `alur.billing.q`, `alur.notifikasi.q`, `alur.tracking.q`) dideklarasikan secara otomatis dan idempoten oleh [`layanan/alur.js`](../../layanan/alur.js) begitu masing-masing service dijalankan. Anda tidak perlu membuatnya secara manual di Management UI.
+>
 > Perintah `npm run db:siapkan` menambahkan tabel-tabel alur integrasi (`alur_pengajuan`, `alur_outbox`, `alur_inbox`, `alur_tracking`) tanpa menghapus data latihan hari sebelumnya.
 
 Implementasi alur end-to-end berada di file [`layanan/alur.js`](../../layanan/alur.js) dengan antrean berawalan `alur.*`. Jalankan kelima service di terminal terpisah:
