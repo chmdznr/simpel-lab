@@ -47,6 +47,11 @@ npm run db:siapkan
 > Skrip `npm run db:siapkan` menambahkan tabel-tabel baru tanpa menghapus data yang sudah ada (aman dijalankan pada container yang sudah memiliki data lama).
 >
 > **Akses RabbitMQ Management UI:** Buka [http://localhost:15672](http://localhost:15672) di browser menggunakan akun default `.env` (Username: `simpel`, Password: `simpel123`).
+>
+> **Topologi Dibuat Otomatis oleh Kode Aplikasi (*Programmatic Declaration*):**
+> Berbeda dengan Lab 1 di mana exchange dan queue dibuat manual lewat Web UI, pada Lab 3 Anda **tidak perlu membuat user, exchange, binding, atau queue secara manual**:
+> 1. **User & Vhost:** Menggunakan akun default `simpel` / `simpel123` pada vhost default `/` yang otomatis dibuat oleh Docker Compose saat container pertama kali start.
+> 2. **Exchange, Queue, & Binding:** Dideklarasikan secara otomatis dan idempoten oleh fungsi `declareTopology()` di [`layanan/messaging.js`](../../layanan/messaging.js) begitu Gateway (`npm run broker:gateway`) atau Worker (`npm run broker:validasi`) pertama kali dinyalakan (membuat exchange `simpel.events`, antrean `validasi.q`, serta dead-letter queue `pengajuan.invalid`).
 
 Siapkan terminal terpisah:
 - **Terminal A:** Service Gateway
