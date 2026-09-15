@@ -12,8 +12,8 @@ Seluruh latihan dijalankan dari root direktori `simpel-lab/` menggunakan Node.js
 
 Lab 5 merupakan penilaian **Nilai Tugas (NT) berbobot 14,3% (5 JP)**. Setiap peserta wajib mengumpulkan satu berkas laporan mandiri:
 
-- **Template Laporan:** Gunakan formulir Markdown yang telah disediakan di **[`lembar-laporan.md`](lembar-laporan.md)**.
-- **Format Pengumpulan:** Simpan salinan file dengan nama `lab5-<nama-atau-nip-peserta>.md` (atau ekspor ke PDF).
+- **Template Laporan:** Gunakan formulir Markdown di **[`lembar-laporan.md`](lembar-laporan.md)** atau dokumen Word di **[`lembar-laporan.docx`](lembar-laporan.docx)**.
+- **Format Pengumpulan:** Peserta dipersilakan mengumpulkan dalam format Microsoft Word (`lab5-<nama-atau-nip-peserta>.docx`), Markdown (`lab5-<nama-atau-nip-peserta>.md`), maupun ekspor PDF.
 - **Komponen Penilaian (Skala 10 Poin):**
   1. *Bagian 1 (3 Poin):* Bukti alur end-to-end (Gateway → Validasi → Billing → Notifikasi → Tracking), polling status hingga `SELESAI`, bukti konsistensi 4 tabel audit, serta penolakan idempotensi HTTP 409 saat reuse key dengan payload berbeda.
   2. *Bagian 2 (3 Poin):* Bukti ketahanan downtime saat Billing mati (antrean menampung tanpa HTTP 504), pemulihan otomatis saat Billing hidup kembali, dan bukti kompensasi pembatalan Saga saat fault injection `uji-gagal` (reservasi dibatalkan).

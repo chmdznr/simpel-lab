@@ -20,8 +20,8 @@ Lab ini berfokus pada **lapisan transport pesan** berdasarkan rancangan Lab 2:
 
 Lab 3 merupakan komponen penilaian **Nilai Tugas (NT)** terbesar pada pelatihan ini (**bobot 17,1% / 6 JP**). Setiap peserta wajib mengumpulkan satu berkas laporan mandiri:
 
-- **Template Laporan:** Gunakan formulir Markdown yang telah disediakan di **[`lembar-laporan.md`](lembar-laporan.md)**.
-- **Format Pengumpulan:** Simpan salinan file dengan nama `lab3-<nama-atau-nip-peserta>.md` (atau ekspor ke PDF).
+- **Template Laporan:** Gunakan formulir Markdown di **[`lembar-laporan.md`](lembar-laporan.md)** atau dokumen Word di **[`lembar-laporan.docx`](lembar-laporan.docx)**.
+- **Format Pengumpulan:** Peserta dipersilakan mengumpulkan dalam format dokumen Microsoft Word (`lab3-<nama-atau-nip-peserta>.docx`), Markdown (`lab3-<nama-atau-nip-peserta>.md`), maupun ekspor PDF.
 - **Komponen Penilaian (Skala 10 Poin):**
   1. *Bagian 1 (2 Poin):* Definisi konseptual perbedaan garansi antara Publisher Confirm dan Manual Acknowledgment.
   2. *Bagian 2 (2 Poin):* Bukti log crash window (`committed` → force-kill → restart dengan `redelivered: true` dan `duplicate: true`) dan verifikasi idempotensi DB tetap 1 baris.

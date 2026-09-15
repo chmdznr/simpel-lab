@@ -22,8 +22,8 @@ Eksperimen Lab 4A menggunakan Fanout Exchange `simpel.fanout` yang diikat (*bind
 ## Deliverable yang Dikumpulkan (Laporan Praktik)
 
 Praktik Lab 4 mencakup modul MP-07 Bagian 1 (Hari 3) dan Bagian 2 (Hari 4) dengan **bobot Nilai Tugas (NT) sebesar 11,4% (Total 10 Poin)**:
-- **Template Laporan:** Gunakan formulir pelaporan terpadu di **[`lembar-laporan.md`](lembar-laporan.md)**.
-- **Format Pengumpulan:** Kumpulkan salinan laporan dengan nama: `lab4-<nama-atau-nip-peserta>.md` (atau `.pdf`).
+- **Template Laporan:** Gunakan formulir pelaporan terpadu di **[`lembar-laporan.md`](lembar-laporan.md)** atau dokumen Word di **[`lembar-laporan.docx`](lembar-laporan.docx)**.
+- **Format Pengumpulan:** Peserta dipersilakan mengumpulkan dalam format Microsoft Word (`lab4-<nama-atau-nip-peserta>.docx`), Markdown (`lab4-<nama-atau-nip-peserta>.md`), maupun ekspor PDF.
 - **Komponen Penilaian:**
   - *Bagian A (Lab 4A - 3 Poin):* Bukti broadcast 1 event ke 2 queue (`fan01`), bukti isolasi tracking downtime (`trackoff`), dan rekonsiliasi data pemulihan.
   - *Bagian B (Lab 4B - 7 Poin):* Matriks topic routing & alternate exchange (3 poin), serta siklus delayed retry TTL, karantina DLQ, dan replay terkendali (4 poin).

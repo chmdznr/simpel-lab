@@ -2,7 +2,7 @@
 
 **Modul MP-07 (Bagian 2) · Hari 4 (Kamis, 17 September 2026) · Praktik 2 JP (90 Menit).**
 
-Lab ini adalah kelanjutan dari Lab 4A. Seluruh latihan dijalankan dari root direktori `simpel-lab/` menggunakan Node.js >= 20.6 dan stack Docker lokal aktif. Semua nama resource menggunakan awalan `lab4b.*` agar tidak mengganggu antrean latihan hari sebelumnya.
+Lab ini adalah kelanjutan dari Lab 4A. Seluruh latihan dijalankan dari root direktori `simpel-lab/` menggunakan Node.js >= 20.6 dan stack Docker lokal aktif. Semua nama resource menggunakan awalan `lab4b.*` agar tidak mengganggu antrean latihan hari sebelumnya. Hasil pengujian dicatat pada formulir laporan terpadu: **[`lembar-laporan.md`](lembar-laporan.md)** atau dokumen Word **[`lembar-laporan.docx`](lembar-laporan.docx)**.
 
 ---
 
