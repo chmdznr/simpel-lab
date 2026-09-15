@@ -19,14 +19,29 @@ Eksperimen Lab 4A menggunakan Fanout Exchange `simpel.fanout` yang diikat (*bind
 
 ---
 
+## Deliverable yang Dikumpulkan (Laporan Praktik)
+
+Praktik Lab 4 mencakup modul MP-07 Bagian 1 (Hari 3) dan Bagian 2 (Hari 4) dengan **bobot Nilai Tugas (NT) sebesar 11,4% (Total 10 Poin)**:
+- **Template Laporan:** Gunakan formulir pelaporan terpadu di **[`lembar-laporan.md`](lembar-laporan.md)**.
+- **Format Pengumpulan:** Kumpulkan salinan laporan dengan nama: `lab4-<nama-atau-nip-peserta>.md` (atau `.pdf`).
+- **Komponen Penilaian:**
+  - *Bagian A (Lab 4A - 3 Poin):* Bukti broadcast 1 event ke 2 queue (`fan01`), bukti isolasi tracking downtime (`trackoff`), dan rekonsiliasi data pemulihan.
+  - *Bagian B (Lab 4B - 7 Poin):* Matriks topic routing & alternate exchange (3 poin), serta siklus delayed retry TTL, karantina DLQ, dan replay terkendali (4 poin).
+
+---
+
 ## Tahapan Praktik (45 Menit)
 
 ### 1. Menit 0–5: Prediksi Alur Fanout
 Buat sketsa diagram satu Fanout Exchange yang terhubung ke dua queue terpisah. Buat prediksi tertulis: apa yang terjadi jika salah satu subscriber (misalnya service Tracking) mati saat event dipublish?
 
 ### 2. Menit 5–10: Persiapan Environment
-Hentikan Gateway dan seluruh worker dari Lab 3 (`Ctrl+C`). Pastikan port 3001 sudah bebas. Jalankan pembaruan tabel database:
+Hentikan Gateway dan seluruh worker dari Lab 3 (`Ctrl+C`). Pastikan port 3001 sudah bebas dari proses sebelumnya, lalu jalankan pembaruan tabel database:
 ```bash
+# Pastikan port 3001 bebas
+lsof -ti :3001 | xargs kill -9 2>/dev/null
+
+# Siapkan skema database lab
 npm run db:siapkan
 ```
 
@@ -47,7 +62,7 @@ SIMPEL_MODE=fanout WORKER_ID=track npm run broker:tracking
 Perhatikan pesan log terminal: pastikan masing-masing worker berhasil mendeklarasikan antreannya dan menampilkan status ready.
 
 ### 4. Menit 15–20: Satu Event, Dua Subscriber Independen
-Di terminal lain, kirim 10 event pengajuan:
+Di terminal lain (Terminal D/E), kirim 10 event pengajuan:
 ```bash
 npm run kirim -- --count=10 --run=fan01
 npm run hasil -- fan01
@@ -60,10 +75,11 @@ Cocokkan ID pengajuan di kedua tabel; kedua consumer menerima `messageId` yang s
 Hentikan hanya service tracking di Terminal C (`Ctrl+C`). Biarkan Gateway dan Validasi tetap berjalan. Kirim 5 event pengajuan baru:
 ```bash
 npm run kirim -- --count=5 --run=trackoff
+npm run hasil -- trackoff
 ```
 
 Amati perbedaannya:
-- Service Validasi tetap memproses pesan secara normal (`validationRows` bertambah 5).
+- Service Validasi tetap memproses pesan secara normal (`validationRows` bertambah 5 menjadi 5).
 - Di RabbitMQ Management UI, antrean `tracking.q` menumpuk 5 pesan (kolom **Ready: 5**).
 - Hasil query `npm run hasil -- trackoff` membuktikan bahwa `validationRows: 5` dan `trackingRows: 0`. Keterlambatan atau matinya service Tracking sama sekali tidak menghambat jalannya proses Validasi!
 
@@ -73,7 +89,11 @@ Nyalakan kembali service Tracking di Terminal C:
 SIMPEL_MODE=fanout WORKER_ID=track npm run broker:tracking
 ```
 
-Amati bahwa antrean `tracking.q` langsung menguras 5 pesan yang tertahan, dan `trackingRows` kini bertambah menjadi 5. 
+Amati bahwa antrean `tracking.q` langsung menguras 5 pesan yang tertahan. Periksa kembali database:
+```bash
+npm run hasil -- trackoff
+```
+Hasil query kini membuktikan `validationRows: 5` dan `trackingRows: 5`. Seluruh data tracking berhasil mengejar ketertinggalan tanpa ada pesan yang hilang!
 
 > **Poin Diskusi Kritis:** Mengapa event yang dipublish SEBELUM queue/binding dibuat tidak akan pernah diterima oleh subscriber baru? (Ingat bahwa RabbitMQ queue bersifat ephemeral/durable point-in-time subscription, bukan replayable event store seperti Kafka!).
 

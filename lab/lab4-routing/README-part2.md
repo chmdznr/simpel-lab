@@ -83,21 +83,40 @@ npm run routing -- peek
 Salin `messageId` yang berada di antrean terdepan (*head of DLQ*), misalnya `evt-xxxx`.
 
 ### 4. Perbaikan Dependensi & Replay Terkendali (Redrive)
-Simulasikan bahwa bug atau dependensi telah diperbaiki dengan environment variable `LAB4_REPAIRED=1`. Lakukan replay pesan dari DLQ:
+Simulasikan bahwa bug atau dependensi telah diperbaiki dengan environment variable `LAB4_REPAIRED=1`. Lakukan replay pesan dari DLQ secara terkendali:
 
-```bash
-# Di Terminal A (Restart worker dalam kondisi sehat):
-LAB4_REPAIRED=1 npm run routing -- worker
-
-# Di Terminal B (Replay pesan spesifik dari DLQ):
-LAB4_REPAIRED=1 npm run routing -- replay evt-ID-DARI-PEEK
-```
-
-Amati bahwa:
-- Pesan dari DLQ dipublish ulang dengan `messageId` yang tetap sama persis.
-- Worker memprosesnya dengan sukses (`processed`), dan jumlah pesan di DLQ berkurang 1.
+1. **Hentikan worker lama di Terminal A** dengan menekan `Ctrl+C`.
+   > **PERINGATAN PENTING:** Pastikan worker lama di Terminal A sudah benar-benar berhenti! Jika Anda lupa mematikannya, worker lama yang masih rusak bisa berebut menarik pesan replay tersebut dan menyebabkannya gagal kembali masuk ke DLQ.
+2. **Jalankan kembali worker di Terminal A** dalam kondisi sehat (*repaired*):
+   ```bash
+   LAB4_REPAIRED=1 npm run routing -- worker
+   ```
+3. **Di Terminal B, jalankan perintah replay** menggunakan `messageId` yang diperoleh dari langkah peek:
+   ```bash
+   LAB4_REPAIRED=1 npm run routing -- replay evt-ID-DARI-PEEK
+   ```
+4. **Verifikasi antrean kembali bersih:**
+   ```bash
+   npm run routing -- inspect
+   ```
+   Amati bahwa pesan pada `lab4b.dlq.q` kini berkurang menjadi **0**, dan worker di Terminal A mencatat log sukses (`"result":"processed"`).
 
 > **Peringatan Operasional:** Jangan pernah melakukan redrive massal dari DLQ secara membabi buta! Pastikan akar masalah teknis sudah teridentifikasi dan terselesaikan, serta pastikan consumer hilir memiliki proteksi idempotensi agar tidak menghasilkan duplikasi transaksi bisnis.
+
+---
+
+## Verifikasi Otomatis & Pengumpulan Tugas
+
+Sebelum mengumpulkan laporan, Anda dapat menjalankan verifikasi otomatis menyeluruh untuk memastikan seluruh skenario Day 4 lulus uji:
+
+```bash
+npm run verify:day4
+```
+
+### Langkah Pengumpulan:
+1. Lengkapi seluruh isian pada formulir terpadu **[`lembar-laporan.md`](lembar-laporan.md)** (mencakup Bagian A untuk Lab 4A dan Bagian B untuk Lab 4B).
+2. Simpan atau ekspor berkas laporan dengan format: `lab4-<nama-atau-nip-peserta>.md` (atau `.pdf`).
+3. Serahkan laporan ke kanal pengumpulan resmi kelas PJJ sesuai instruksi pengajar/panitia.
 
 ---
 
