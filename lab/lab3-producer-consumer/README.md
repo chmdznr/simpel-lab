@@ -21,19 +21,25 @@ Lab ini berfokus pada **lapisan transport pesan** berdasarkan rancangan Lab 2:
 Jalankan perintah dari **root repository `simpel-lab/`**, menggunakan Node.js >= 20.6 (mendukung flag `--env-file`), Docker aktif, dan konfigurasi `.env` yang sudah disiapkan:
 
 ```bash
+# Salin konfigurasi template jika file .env belum ada
+cp -n .env.contoh .env
+
+# Jalankan container broker dan database
 docker compose up -d rabbitmq postgres
 npm install
 npm run db:siapkan
 ```
 
 > Skrip `npm run db:siapkan` menambahkan tabel-tabel baru tanpa menghapus data yang sudah ada (aman dijalankan pada container yang sudah memiliki data lama).
+>
+> **Akses RabbitMQ Management UI:** Buka [http://localhost:15672](http://localhost:15672) di browser menggunakan akun default `.env` (Username: `simpel`, Password: `simpel123`).
 
 Siapkan terminal terpisah:
 - **Terminal A:** Service Gateway
 - **Terminal B, C, D:** Consumer Worker (Validasi)
 - **Terminal E:** Pengirim beban request dan pengamat hasil (*evidence*)
 
-Pastikan service demo synchronous lama di port 3001 sudah dimatikan.
+Pastikan service demo synchronous lama di port 3001 sudah dimatikan (`lsof -ti :3001 | xargs kill -9 2>/dev/null`).
 
 ---
 
@@ -54,7 +60,7 @@ Pastikan service demo synchronous lama di port 3001 sudah dimatikan.
    npm run kirim -- --count=1 --run=awal
    ```
    Bukti respons akan dicatat ke `.evidence/awal.json`. Periksa nilai status `confirmed` dan ID yang dihasilkan.
-4. Buka RabbitMQ Management UI di vhost Anda $\rightarrow$ tab **Queues** $\rightarrow$ antrean `validasi.q`.
+4. Buka RabbitMQ Management UI di [http://localhost:15672](http://localhost:15672) (user: `simpel`, pass: `simpel123`) $\rightarrow$ tab **Queues** $\rightarrow$ antrean `validasi.q`.
    Perhatikan kolom **Ready** bertambah menjadi 1. Jangan menekan tombol *Get messages* dengan mode *auto-ack* karena akan menghapus pesan uji.
 5. Di Terminal E, periksa database:
    ```bash
@@ -94,10 +100,27 @@ Pastikan service demo synchronous lama di port 3001 sudah dimatikan.
      ```bash
      VALIDASI_ACK_DELAY_MS=10000 npm run broker:validasi
      ```
-   - Di Terminal E, kirim satu pengajuan dengan run ID baru.
-   - Segera setelah log menampilkan `committed`, hentikan proses worker tersebut secara paksa (*force kill* PID worker).
-   - Jalankan kembali worker normal: amati log worker mendeteksi `redelivered: true` dan `duplicate: true`.
-   - Periksa bahwa database tidak menduplikasi baris berkat proteksi `ON CONFLICT (id) DO NOTHING`.
+     *Perhatikan nama worker di baris log awal, misalnya `worker: "validasi-12345"` di mana angka di belakang adalah PID proses.*
+   - Di Terminal E, kirim satu pengajuan uji crash:
+     ```bash
+     npm run kirim -- --count=1 --run=crash01
+     ```
+   - Segera setelah log Terminal B menampilkan `committed: true`, hentikan proses worker secara paksa (**force kill** PID worker) sebelum delay 10 detik berakhir:
+     ```bash
+     # Di Terminal E (atau terminal baru):
+     kill -9 <PID_WORKER>
+     ```
+     > **PERINGATAN PENTING:** Jangan hanya menekan `Ctrl+C` biasa satu kali! Kode worker memiliki mekanisme *graceful shutdown* yang menunggu hingga 12 detik agar pekerjaan aktif selesai. Jika Anda menekan `Ctrl+C` biasa, worker akan menunggu delay 10 detik lalu meng-ack pesan, sehingga redelivery tidak terjadi. Gunakan `kill -9 <PID>`, tekan `Ctrl+\` (SIGQUIT di Linux/macOS), atau tekan `Ctrl+C` dua kali secara cepat untuk menghentikan proses seketika.
+   - Nyalakan kembali worker dalam mode normal di Terminal B:
+     ```bash
+     npm run broker:validasi
+     ```
+     Amati log worker: broker secara otomatis mengirim ulang pesan unacked tersebut dengan status `"redelivered": true`, dan worker mendeteksi `"duplicate": true`.
+   - Di Terminal E, periksa rekonsiliasi database:
+     ```bash
+     npm run hasil -- crash01
+     ```
+     Hasilnya membuktikan `validationRows: 1`. Data bisnis tidak menduplikasi baris berkat proteksi klausa `ON CONFLICT (id) DO NOTHING` pada query INSERT worker.
 
 ---
 
@@ -144,15 +167,16 @@ WORKER_ID=w2 VALIDASI_PREFETCH=1 VALIDASI_POOL_MAX=4 npm run broker:validasi
 WORKER_ID=w3 VALIDASI_PREFETCH=1 VALIDASI_POOL_MAX=4 npm run broker:validasi
 ```
 
-Di Terminal E, kirim 120 pesan:
+Di Terminal E, kirim 120 pesan dan verifikasi database:
 ```bash
 npm run kirim -- --count=120 --run=p1
+npm run hasil -- p1
 ```
-Tunggu hingga seluruh pesan selesai, lalu amati metrik ringkasan pada log akhir worker (`received per worker`, `maxInFlight`, `maxPoolWaiting`).
+Tunggu hingga seluruh 120 pesan selesai masuk ke database (`validationRows: 120`), lalu hentikan ketiga worker dengan `Ctrl+C`. Amati baris metrik ringkasan terakhir (`"final": true`) yang dicetak masing-masing worker (`received`, `maxInFlight`, `maxPoolWaiting`, `cpuMs`).
 
 ### Eksperimen 2: Greedy Dispatch (Prefetch = 100)
 
-Hentikan ketiga worker, lalu jalankan kembali dengan prefetch 100:
+Jalankan kembali ketiga worker dengan prefetch 100:
 
 ```bash
 # Terminal B:
@@ -163,21 +187,41 @@ WORKER_ID=w2 VALIDASI_PREFETCH=100 VALIDASI_POOL_MAX=4 npm run broker:validasi
 WORKER_ID=w3 VALIDASI_PREFETCH=100 VALIDASI_POOL_MAX=4 npm run broker:validasi
 ```
 
-Kirim kembali 120 pesan dengan run ID `p100`:
+Kirim kembali 120 pesan dengan run ID `p100` dan verifikasi database:
 ```bash
 npm run kirim -- --count=120 --run=p100
+npm run hasil -- p100
 ```
+Setelah antrean tuntas (`validationRows: 120`), hentikan ketiga worker dengan `Ctrl+C` dan catat metrik ringkasan terakhirnya.
+
+### Glosarium Metrik JSON Worker
+
+Setiap 1 detik dan saat worker dihentikan (`final: true`), worker mencetak metrik JSON dengan struktur berikut:
+
+| Field Log JSON | Makna Teknis | Relevansi Pengamatan |
+|---|---|---|
+| `received` | Total pesan yang diterima worker sejak menyala | Distribusi pembagian beban antar-worker |
+| `stored` | Total baris baru yang berhasil di-INSERT | Jumlah data valid yang tersimpan |
+| `duplicates` | Pesan yang menabrak `ON CONFLICT` | Indikasi pemrosesan pesan duplikat |
+| `maxInFlight` | Puncak pesan aktif (`active`) yang dipegang worker | Dibatasi oleh `VALIDASI_PREFETCH` |
+| `maxPoolWaiting` | Puncak antrean koneksi DB (`pool.waitingCount`) | Terjadi saat pesan in-flight melebihi kapasitas pool |
+| `dbAndWaitMs` | Akumulasi durasi tunggu pool + eksekusi SQL | Indikator latensi pemrosesan di sisi database |
+| `cpuMs` | Akumulasi waktu CPU proses Node.js | Bukti bahwa beban utama adalah I/O, bukan CPU |
 
 ### Tabel Komparasi Hasil Eksperimen
 
-| Metrik Evaluasi | Prefetch = 1 | Prefetch = 100 |
+| Metrik Evaluasi | Prefetch = 1 (Fair Dispatch) | Prefetch = 100 (Greedy Dispatch) |
 |---|---|---|
-| Total waktu penyelesaian (*elapsed time*) | *(catat hasil)* | *(catat hasil)* |
-| Distribusi beban antar worker (w1 / w2 / w3) | Rata (~40 / ~40 / ~40) | Cenderung timpang |
-| Puncak pesan in-flight per worker | Maksimal 1 per worker | Hingga 100 menumpuk di memori worker |
-| Antrean koneksi database (*pool waiting*) | Terkendali (<= pool max) | Berisiko pool starvation |
+| Total waktu penyelesaian (*elapsed time*) | ~5.200 ms | ~1.300 ms |
+| Puncak koneksi DB aktif (*pg_sleep concurrent*) | Maksimal 3 (1 per worker) | Hingga 12 (kapasitas penuh pool: 3 worker × 4) |
+| Puncak pesan in-flight per worker (`maxInFlight`) | Tepat 1 per worker | Hingga ~30–40 per worker (menumpuk di memori) |
+| Antrean koneksi database (`maxPoolWaiting`) | Terkendali (0–1) | Menumpuk (~25–35 per worker menunggu koneksi) |
+| Distribusi beban antar worker (w1 / w2 / w3) | Sangat berimbang (~40 / ~40 / ~40) | Cenderung timpang jika ada variasi latensi |
 
-> **Prinsip Teknis:** Nilai `prefetch` membatasi jumlah pesan yang belum di-ack yang boleh dikirim broker ke satu worker. Nilai prefetch rendah (misalnya 1–10) menjamin pembagian beban yang adil (*fair dispatch*) pada tugas berat, sedangkan prefetch tinggi cocok untuk pesan ringan berkecepatan tinggi dengan pemrosesan CPU murni.
+> **Prinsip Teknis & Analisis Bottleneck:**
+> 1. **Mengapa Prefetch 100 selesai lebih cepat pada uji coba ini?** Karena beban kerja simulasi ini adalah **I/O-bound** (`pg_sleep` di database), bukan CPU-bound. Dengan prefetch 100, ketiga worker dapat memanfaatkan batas pool database secara penuh (12 koneksi paralel $\rightarrow$ throughput teoritis $\approx 12 / 0{,}12 = 100$ msg/detik). Pada prefetch 1, setiap worker hanya memproses 1 pesan pada satu waktu sehingga total koneksi database yang terpakai hanya 3 (throughput teoritis $\approx 3 / 0{,}12 = 25$ msg/detik).
+> 2. **Kelemahan Prefetch 100:** Backlog pesan berpindah dari antrean broker ke dalam memori aplikasi worker. Jika salah satu worker mengalami crash di tengah jalan, seluruh pesan in-flight yang tertimbun di memorinya harus dikembalikan ke broker (*requeue/redeliver*), meningkatkan risiko latensi kaskade dan ketidakadilan beban (*unfair distribution*).
+> 3. **Kesimpulan Arsitektur:** Nilai `prefetch` rendah (1–10) ideal untuk beban komputasi berat (*CPU-bound*) atau durasi kerja yang tidak seragam agar beban terbagi adil (*fair dispatch*). Nilai `prefetch` moderat (10–50) dipadukan dengan ukuran pool database yang memadai ideal untuk throughput I/O tinggi.
 
 ---
 
