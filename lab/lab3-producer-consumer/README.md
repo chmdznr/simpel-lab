@@ -16,6 +16,20 @@ Lab ini berfokus pada **lapisan transport pesan** berdasarkan rancangan Lab 2:
 
 ---
 
+## Deliverable yang Dikumpulkan (Laporan Praktik)
+
+Lab 3 merupakan komponen penilaian **Nilai Tugas (NT)** terbesar pada pelatihan ini (**bobot 17,1% / 6 JP**). Setiap peserta wajib mengumpulkan satu berkas laporan mandiri:
+
+- **Template Laporan:** Gunakan formulir Markdown yang telah disediakan di **[`lembar-laporan.md`](lembar-laporan.md)**.
+- **Format Pengumpulan:** Simpan salinan file dengan nama `lab3-<nama-atau-nip-peserta>.md` (atau ekspor ke PDF).
+- **Komponen Penilaian (Skala 10 Poin):**
+  1. *Bagian 1 (2 Poin):* Definisi konseptual perbedaan garansi antara Publisher Confirm dan Manual Acknowledgment.
+  2. *Bagian 2 (2 Poin):* Bukti log crash window (`committed` $\rightarrow$ force-kill $\rightarrow$ restart dengan `redelivered: true` dan `duplicate: true`) dan verifikasi idempotensi DB tetap 1 baris.
+  3. *Bagian 3 (3 Poin):* Bukti rekonsiliasi 100 pesan pulih utuh saat consumer mati (`.evidence/mati01.json` vs `validationRows: 100`).
+  4. *Bagian 4 (3 Poin):* Tabel komparasi metrik riil Prefetch 1 vs 100 beserta analisis objektif utilisasi pool koneksi database.
+
+---
+
 ## Prasyarat Lingkungan dan Terminal
 
 Jalankan perintah dari **root repository `simpel-lab/`**, menggunakan Node.js >= 20.6 (mendukung flag `--env-file`), Docker aktif, dan konfigurasi `.env` yang sudah disiapkan:
@@ -225,14 +239,19 @@ Setiap 1 detik dan saat worker dihentikan (`final: true`), worker mencetak metri
 
 ---
 
-## Verifikasi Otomatis untuk Evaluasi
+## Verifikasi Otomatis & Pengumpulan Tugas
 
-Tersedia skrip pengujian menyeluruh untuk memvalidasi seluruh fungsionalitas Lab 3:
+Sebelum mengumpulkan laporan, jalankan pengujian terisolasi untuk memastikan seluruh fungsionalitas sistem telah lulus uji:
 
 ```bash
 npm run verify:day3
 ```
 
-Skrip ini menjalankan suite pengujian terisolasi (stack QA terpisah) untuk memeriksa publisher confirm, recovery consumer mati, deduplikasi pesan, hingga verifikasi prefetch.
+Skrip ini menjalankan suite pengujian terisolasi (stack QA terpisah) untuk memeriksa publisher confirm, recovery consumer mati, deduplikasi pesan, hingga verifikasi prefetch. Salin ringkasan output pengujian ini ke Bagian 5 lembar laporan.
+
+### Langkah Pengumpulan:
+1. Lengkapi seluruh isian pada formulir **[`lembar-laporan.md`](lembar-laporan.md)**.
+2. Simpan atau ekspor berkas laporan dengan format: `lab3-<nama-atau-nip-peserta>.md` (atau `.pdf`).
+3. Serahkan laporan ke kanal pengumpulan resmi kelas PJJ sesuai instruksi pengajar/panitia.
 
 Rujukan teknis: [amqplib Channel API Guide](https://amqp-node.github.io/amqplib/channel_api.html), [RabbitMQ Confirms](https://www.rabbitmq.com/docs/confirms), dan [Consumer Prefetch](https://www.rabbitmq.com/docs/consumer-prefetch).
