@@ -1,6 +1,6 @@
 # Lab 7 — Lembar Laporan Investigasi Kasus Troubleshooting
 
-**Modul MP-10 · Hari 5 (Jumat, 18 September 2026) · Praktik 2 JP (90 Menit)**  
+**Modul MP-10 · Hari 5 (Jumat, 18 September 2026) · Sesi Praktik 1 JP (45 Menit)**  
 **Instrumen Penilaian Nilai Tugas (NT) · Bobot Modul: 5,7% (Maksimal 10 Poin)**
 
 ---

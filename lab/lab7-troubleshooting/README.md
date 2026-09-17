@@ -65,7 +65,8 @@ npm run kasus -- inspect c
 npm run kasus -- verify c
 ```
 
-*(Untuk Kasus A, perbaikan cukup dengan menjalankan worker di terminal kedua: `npm run kasus -- worker a`).*
+*(Untuk Kasus A, perbaikan cukup dengan menjalankan worker di terminal kedua: `npm run kasus -- worker a`).*  
+*(Untuk Kasus C: biarkan worker di Terminal 2 tetap berjalan saat menjalankan `repair c`; script repair akan memulihkan flag dependensi sehingga worker otomatis melanjutkan pemrosesan sisa pesan).*
 
 ### Kriteria Kelulusan Verifikasi
 

@@ -50,8 +50,8 @@ npm run operasi -- snapshot
    ```
    Consumer ini membaca pesan dengan manual ack, prefetch 2, dan delay artifisial 200 ms per pesan.
 4. **Amati Pemulihan (*Recovery*):**
-   - Di Grafana, amati kurva Ready menurun stabil, angka delivery/ack rate meningkat.
-   - Di Prometheus Alerts, amati status alert `SimpelQueueWithoutConsumer` otomatis beralih menjadi resolved/mati begitu antrean terkuras habis.
+   - Di Grafana, amati kurva Ready menurun stabil hingga nol, sementara delivery/ack rate meningkat.
+   - Di Prometheus Alerts, amati status alert `SimpelQueueWithoutConsumer` otomatis kembali normal (*Resolved*) begitu antrean surut dan seluruh pesan selesai diproses.
 
 ---
 
@@ -117,7 +117,7 @@ Setiap penolakan hak akses menghasilkan kode error AMQP `403/ACCESS_REFUSED` dan
 ## 6. Deliverable yang Dikumpulkan (Laporan Praktik)
 
 Praktik Lab 6 memiliki bobot penilaian **11,4% Nilai Total Pelatihan (NT)** sesuai instrumen penilaian MP-09 (Sesi 13 / Monitoring Metrik & Pengamanan Akses, total 10 poin):
-1. **Penyusunan & Pengamatan Grafana Dashboard (Bobot: 25% / 2.5 Poin):** Screenshot dashboard dengan 6 metrik kunci (Ready, Unacked, Consumers, Publish Rate, Ack Rate, Health) saat terjadi backlog pesan.
+1. **Penyusunan & Pengamatan Grafana Dashboard (Bobot: 25% / 2.5 Poin):** Screenshot dashboard dengan 6 metrik kunci (Ready, Unacked, Consumers, Delivery/Ack Rate, Redelivery Rate, Scrape Health) saat terjadi backlog pesan.
 2. **Pengujian & Siklus Hidup Alerting Prometheus (Bobot: 25% / 2.5 Poin):** Bukti transisi alert rule `SimpelQueueWithoutConsumer` dari status *Pending*, *Firing*, hingga *Resolved* saat worker pulih.
 3. **Analisis Query PromQL (Bobot: 20% / 2 Poin):** Penjelasan teknis query metrik per-object, counter throughput, dan evaluasi threshold alert.
 4. **Pembuktian Audit Hak Akses Least Privilege (Bobot: 20% / 2 Poin):** Output audit permission regex dan bukti 4 skenario security probe pada user publisher.

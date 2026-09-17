@@ -1,6 +1,6 @@
 # Lab 6 — Lembar Laporan Praktik Monitoring, Alerting, & Kontrol Akses
 
-**Modul MP-09 · Hari 5 (Jumat, 18 September 2026) · Praktik 4 JP (180 Menit)**  
+**Modul MP-09 · Hari 5 (Jumat, 18 September 2026) · Sesi Praktik 2 JP (90 Menit)**  
 **Instrumen Penilaian Nilai Tugas (NT) · Bobot Modul: 11,4% (Maksimal 10 Poin)**
 
 ---
@@ -100,7 +100,7 @@ Tuliskan konfigurasi hak akses regex untuk user `lab6-publisher` pada vhost `lab
 |---|:---:|:---:|:---:|
 | **1. Publish ke `lab6.events`** | Berhasil terkirim | `Confirmed` | **[ Lulus / Gagal ]** |
 | **2. Publish ke exchange lain (`lab6.other`)** | Ditolak oleh broker | `ACCESS_REFUSED (403)` | **[ Lulus / Gagal ]** |
-| **3. Deklarasi Queue Baru (`lab6.hacker.q`)** | Ditolak oleh broker | `ACCESS_REFUSED (403)` | **[ Lulus / Gagal ]** |
+| **3. Deklarasi Queue Baru (`lab6.forbidden`)** | Ditolak oleh broker | `ACCESS_REFUSED (403)` | **[ Lulus / Gagal ]** |
 | **4. Consume / Get Pesan dari `lab6.q`** | Ditolak oleh broker | `ACCESS_REFUSED (403)` | **[ Lulus / Gagal ]** |
 
 **Refleksi Keamanan Arsitektur:**  
